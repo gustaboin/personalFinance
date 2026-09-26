@@ -84,97 +84,430 @@ export default function Dashboard() {
     }
   }
 
-  return (
+ return (
     <div className="space-y-6">
+
+      {/* =====================================================
+          HEADER
+      ====================================================== */}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-slate-900">Resumen del mes</h2>
-        <MonthSwitcher mesPeriodo={mesPeriodo} onChange={setMesPeriodo} />
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+            Resumen del mes
+          </h2>
+
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Tu situación financiera para este período.
+          </p>
+        </div>
+
+        <MonthSwitcher
+          mesPeriodo={mesPeriodo}
+          onChange={setMesPeriodo}
+        />
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-wrap items-end gap-4 shadow-sm">
-        <div>
-          <label className="block text-xs font-medium text-slate-500 mb-1">Tipo de cambio USD de este mes</label>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              value={tc}
-              onChange={(e) => setTc(e.target.value)}
-              placeholder="ej. 1500"
-              className="w-32 rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
-            />
-            <button
-              onClick={guardarTc}
-              disabled={savingTc || !tc}
-              className="rounded-lg bg-slate-900 text-white text-sm px-3 py-1.5 disabled:opacity-40"
+      {/* =====================================================
+          CONFIGURACIÓN DEL MES
+      ====================================================== */}
+
+      <div
+        className="
+          bg-white
+          border border-slate-200
+          rounded-2xl
+          p-5
+          shadow-sm
+
+          dark:bg-slate-900
+          dark:border-slate-800
+          dark:shadow-black/20
+        "
+      >
+        <div className="flex flex-wrap items-end gap-6">
+
+          {/* Tipo de cambio */}
+          <div>
+            <label
+              className="
+                block
+                text-xs
+                font-medium
+                text-slate-500
+                dark:text-slate-400
+                mb-1.5
+              "
             >
-              Guardar
-            </button>
+              Tipo de cambio USD
+            </label>
+
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={tc}
+                onChange={(e) =>
+                  setTc(e.target.value)
+                }
+                placeholder="ej. 1500"
+                className="
+                  w-32
+                  rounded-lg
+                  border border-slate-300
+                  bg-white
+                  text-slate-900
+                  px-3
+                  py-1.5
+                  text-sm
+
+                  focus:outline-none
+                  focus:ring-2
+                  focus:ring-slate-200
+
+                  dark:border-slate-700
+                  dark:bg-slate-800
+                  dark:text-white
+                  dark:focus:ring-slate-700
+                "
+              />
+
+              <button
+                onClick={guardarTc}
+                disabled={savingTc || !tc}
+                className="
+                  rounded-lg
+                  bg-slate-900
+                  hover:bg-slate-800
+                  text-white
+                  text-sm
+                  font-medium
+                  px-3
+                  py-1.5
+                  disabled:opacity-40
+                  transition-colors
+
+                  dark:bg-slate-700
+                  dark:hover:bg-slate-600
+                "
+              >
+                {savingTc
+                  ? 'Guardando...'
+                  : 'Guardar'}
+              </button>
+            </div>
           </div>
+
+          {/* Objetivo */}
+          <div>
+            <label
+              className="
+                block
+                text-xs
+                font-medium
+                text-slate-500
+                dark:text-slate-400
+                mb-1.5
+              "
+            >
+              Objetivo de ahorro mensual
+            </label>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={objetivoUsd}
+                onChange={(e) =>
+                  setObjetivoUsd(
+                    Number(e.target.value) || 0
+                  )
+                }
+                className="
+                  w-32
+                  rounded-lg
+                  border border-slate-300
+                  bg-white
+                  text-slate-900
+                  px-3
+                  py-1.5
+                  text-sm
+
+                  focus:outline-none
+                  focus:ring-2
+                  focus:ring-slate-200
+
+                  dark:border-slate-700
+                  dark:bg-slate-800
+                  dark:text-white
+                  dark:focus:ring-slate-700
+                "
+              />
+
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                USD
+              </span>
+            </div>
+          </div>
+
+          {/* Aviso TC */}
+          {!tcGuardado && (
+            <div
+              className="
+                flex-1
+                min-w-[220px]
+                rounded-lg
+                bg-amber-50
+                border border-amber-200
+                px-3
+                py-2
+
+                dark:bg-amber-950/30
+                dark:border-amber-900
+              "
+            >
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Sin tipo de cambio guardado.
+                Los cálculos que convierten USD a ARS
+                pueden estar incompletos.
+              </p>
+            </div>
+          )}
+
         </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-500 mb-1">Objetivo de ahorro mensual (USD)</label>
-          <input
-            type="number"
-            value={objetivoUsd}
-            onChange={(e) => setObjetivoUsd(Number(e.target.value) || 0)}
-            className="w-32 rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
-          />
-        </div>
-        {!tcGuardado && (
-          <p className="text-xs text-amber-600">Sin tipo de cambio guardado, los cálculos en ARS pueden no incluir tus aportes en USD.</p>
-        )}
       </div>
+
+      {/* =====================================================
+          LOADING
+      ====================================================== */}
 
       {loading ? (
-        <p className="text-slate-400 text-sm">Cargando...</p>
+        <p className="text-slate-400 dark:text-slate-500 text-sm">
+          Cargando...
+        </p>
       ) : (
         <>
+
+          {/* =================================================
+              SEMÁFORO
+          ================================================== */}
+
           <div
-            className={`rounded-2xl p-5 text-white font-medium shadow-sm ${
-              semaforo.tone === 'good' ? 'bg-emerald-600' : semaforo.tone === 'bad' ? 'bg-rose-600' : 'bg-amber-500'
-            }`}
+            className={`
+              rounded-2xl
+              p-5
+              shadow-sm
+              text-white
+
+              ${
+                semaforo.tone === 'good'
+                  ? 'bg-emerald-600'
+                  : semaforo.tone === 'bad'
+                    ? 'bg-rose-600'
+                    : 'bg-amber-500'
+              }
+            `}
           >
-            {semaforo.label}
+            <p className="text-xs uppercase tracking-wide opacity-80 mb-1">
+              Situación del mes
+            </p>
+
+            <p className="text-lg font-semibold">
+              {semaforo.label}
+            </p>
           </div>
+
+          {/* =================================================
+              PRINCIPALES NÚMEROS
+          ================================================== */}
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Ingresos" value={formatARS(totales.ingresos)} />
-            <StatCard label="Egresos (sin ahorro)" value={formatARS(totales.egresosSinAhorro)} />
+
             <StatCard
-              label="Ahorro este mes"
-              value={formatARS(totales.ahorroRealizado)}
-              sub={`Objetivo: ${formatUSD(objetivoUsd)} (${formatARS(totales.objetivoAhorroArs)})`}
-              tone={totales.ahorroCumplido ? 'good' : 'warn'}
+              label="Ingresos"
+              value={formatARS(
+                totales.ingresos
+              )}
             />
+
+            <StatCard
+              label="Egresos"
+              value={formatARS(
+                totales.egresosSinAhorro
+              )}
+            />
+
+            <StatCard
+              label="Ahorro"
+              value={formatARS(
+                totales.ahorroRealizado
+              )}
+              sub={`
+                Objetivo: ${formatUSD(
+                  objetivoUsd
+                )}
+                (${formatARS(
+                  totales.objetivoAhorroArs
+                )})
+              `}
+              tone={
+                totales.ahorroCumplido
+                  ? 'good'
+                  : 'warn'
+              }
+            />
+
             <StatCard
               label="Disponible"
-              value={formatARS(totales.disponible)}
-              tone={totales.disponible >= 0 ? 'good' : 'bad'}
+              value={formatARS(
+                totales.disponible
+              )}
+              tone={
+                totales.disponible >= 0
+                  ? 'good'
+                  : 'bad'
+              }
             />
+
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-700 mb-1">Deuda comprometida en cuotas futuras</p>
-            <p className="text-xl font-semibold text-slate-900">{formatARS(totales.deudaTotal)}</p>
-            <p className="text-xs text-slate-400">Suma de todas las cuotas que vencen después de este mes</p>
+          {/* =================================================
+              DEUDA FUTURA
+          ================================================== */}
+
+          <div
+            className="
+              bg-white
+              border border-slate-200
+              rounded-2xl
+              p-5
+              shadow-sm
+
+              dark:bg-slate-900
+              dark:border-slate-800
+              dark:shadow-black/20
+            "
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+
+              <div>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Deuda comprometida
+                </p>
+
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                  Cuotas que vencen después de este mes.
+                </p>
+              </div>
+
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                {formatARS(
+                  totales.deudaTotal
+                )}
+              </p>
+
+            </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-700 mb-4">Egresos por categoría</p>
+          {/* =================================================
+              GASTOS POR CATEGORÍA
+          ================================================== */}
+
+          <div
+            className="
+              bg-white
+              border border-slate-200
+              rounded-2xl
+              p-5
+              shadow-sm
+
+              dark:bg-slate-900
+              dark:border-slate-800
+              dark:shadow-black/20
+            "
+          >
+            <div className="mb-4">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                Egresos por categoría
+              </p>
+
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                Distribución de tus gastos durante el mes.
+              </p>
+            </div>
+
             {chartData.length === 0 ? (
-              <p className="text-sm text-slate-400">Sin gastos cargados este mes.</p>
+              <p className="text-sm text-slate-400 dark:text-slate-500">
+                Sin gastos cargados este mes.
+              </p>
             ) : (
-              <ResponsiveContainer width="100%" height={Math.max(200, chartData.length * 40)}>
-                <BarChart data={chartData} layout="vertical" margin={{ left: 24 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" tickFormatter={(v) => formatARS(v)} fontSize={12} />
-                  <YAxis type="category" dataKey="categoria" width={140} fontSize={12} />
-                  <Tooltip formatter={(v) => formatARS(v)} />
-                  <Bar dataKey="total" fill="#0f172a" radius={[0, 6, 6, 0]} />
+              <ResponsiveContainer
+                width="100%"
+                height={Math.max(
+                  220,
+                  chartData.length * 40
+                )}
+              >
+                <BarChart
+                  data={chartData}
+                  layout="vertical"
+                  margin={{
+                    left: 24,
+                    right: 20,
+                  }}
+                >
+
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    horizontal={false}
+                    stroke="#64748b"
+                    opacity={0.2}
+                  />
+
+                  <XAxis
+                    type="number"
+                    tickFormatter={(v) =>
+                      formatARS(v)
+                    }
+                    fontSize={11}
+                    stroke="#94a3b8"
+                  />
+
+                  <YAxis
+                    type="category"
+                    dataKey="categoria"
+                    width={140}
+                    fontSize={12}
+                    stroke="#94a3b8"
+                  />
+
+                  <Tooltip
+                    formatter={(v) =>
+                      formatARS(v)
+                    }
+                    contentStyle={{
+                      backgroundColor: '#0f172a',
+                      border: '1px solid #334155',
+                      borderRadius: '10px',
+                      color: '#fff',
+                    }}
+                  />
+
+                  <Bar
+                    dataKey="total"
+                    fill="#3b82f6"
+                    radius={[
+                      0,
+                      6,
+                      6,
+                      0,
+                    ]}
+                  />
+
                 </BarChart>
               </ResponsiveContainer>
             )}
+
           </div>
+
         </>
       )}
     </div>

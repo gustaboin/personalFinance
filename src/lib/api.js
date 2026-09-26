@@ -217,3 +217,53 @@ export async function getMovimientosTarjeta(mesPeriodo, medioPagoId) {
   if (error) throw error
   return data
 }
+
+//- funciones para proyectos especiales Obra constucción y ahorro vivienda etc
+
+export async function getProyectos() {
+  const { data, error } = await supabase
+    .from('proyectos')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function getResumenProyecto(id) {
+  const [resumen, rubros, proveedores] = await Promise.all([
+    supabase.rpc('resumen_proyecto', { p_proyecto_id: id }),
+    supabase.rpc('resumen_proyecto_rubro', { p_proyecto_id: id }),
+    supabase.rpc('resumen_proyecto_proveedor', { p_proyecto_id: id }),
+  ])
+
+  if (resumen.error) throw resumen.error
+  if (rubros.error) throw rubros.error
+  if (proveedores.error) throw proveedores.error
+
+  return {
+    ...resumen.data?.[0],
+    porRubro: rubros.data ?? [],
+    proveedores: proveedores.data ?? [],
+  }
+}
+
+/*
+export async function getMovimientosProyecto(id) {
+  const { data, error } = await supabase.rpc('movimientos_proyecto', {
+    p_proyecto_id: id,
+  })
+  if (error) throw error
+  return data ?? []
+}
+*/
+
+// reemplazo la funcion orginal por una que use la vista vw_movimientos_proyecto, para poder filtrar por id_proyecto y ordenar por fecha
+export async function getMovimientosProyecto(id) {
+  const { data, error } = await supabase
+    .from('vw_movimientos_proyecto')
+    .select('*')
+    .eq('id_proyecto', id)
+    .order('fecha', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
