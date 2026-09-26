@@ -8,6 +8,7 @@ import Presupuesto from './pages/Presupuesto'
 import Evolucion from './pages/Evolucion'
 import Tarjetas from './pages/Tarjetas'
 import Proyectos from './pages/Proyectos'
+import Prestamos from './pages/Prestamos'
 
 import {
   LayoutDashboard,
@@ -29,6 +30,7 @@ const TABS = [
   { id: 'cuotas', label: 'Cuotas', icon: Receipt, component: Cuotas },
   { id: 'presupuesto', label: 'Presupuesto', icon: Target, component: Presupuesto },
   { id: 'proyectos', label: 'Proyectos', icon: FolderTree, component: Proyectos },
+  { id: 'prestamos', label: 'Prestamos', icon: CreditCard, component: Prestamos },
 ]
 
 function Shell() {

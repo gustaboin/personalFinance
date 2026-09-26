@@ -23,6 +23,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [savingTc, setSavingTc] = useState(false)
 
+  // Toggle para incluir/excluir gastos de proyectos (ej. Obra) del resumen del mes
+  const [incluirProyectos, setIncluirProyectos] = useState(false)
+
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -46,10 +49,23 @@ export default function Dashboard() {
     return () => { cancelled = true }
   }, [mesPeriodo])
 
+  // Base filtrada: si incluirProyectos es false (default), sacamos las filas es_proyecto = true
+  // El ?. y === true son defensivos: si por algún motivo la vista todavía no trae es_proyecto
+  // (columna vieja en caché, etc.), no filtra nada y no rompe la pantalla.
+  const datosFiltrados = useMemo(() => {
+    if (incluirProyectos) return resumen
+    return resumen.filter((r) => r.es_proyecto !== true)
+  }, [resumen, incluirProyectos])
+
+  const hayDatosDeProyecto = useMemo(
+    () => resumen.some((r) => r.es_proyecto === true),
+    [resumen]
+  )
+
   const totales = useMemo(() => {
-    const ingresos = resumen.filter((r) => r.tipo === 'Ingreso').reduce((s, r) => s + Number(r.total_ars), 0)
-    const egresosTotal = resumen.filter((r) => r.tipo === 'Egreso').reduce((s, r) => s + Number(r.total_ars), 0)
-    const ahorroRealizado = resumen.find((r) => r.categoria === 'Ahorro')?.total_ars ?? 0
+    const ingresos = datosFiltrados.filter((r) => r.tipo === 'Ingreso').reduce((s, r) => s + Number(r.total_ars), 0)
+    const egresosTotal = datosFiltrados.filter((r) => r.tipo === 'Egreso').reduce((s, r) => s + Number(r.total_ars), 0)
+    const ahorroRealizado = datosFiltrados.find((r) => r.categoria === 'Ahorro')?.total_ars ?? 0
     const egresosSinAhorro = egresosTotal - Number(ahorroRealizado)
     const tcValor = Number(tc) || 0
     const objetivoAhorroArs = objetivoUsd * tcValor
@@ -57,7 +73,7 @@ export default function Dashboard() {
     const ahorroCumplido = Number(ahorroRealizado) >= objetivoAhorroArs && objetivoAhorroArs > 0
     const deudaTotal = deudaFutura.reduce((s, d) => s + Number(d.importe), 0)
     return { ingresos, egresosSinAhorro, ahorroRealizado: Number(ahorroRealizado), objetivoAhorroArs, disponible, ahorroCumplido, deudaTotal }
-  }, [resumen, tc, objetivoUsd, deudaFutura])
+  }, [datosFiltrados, tc, objetivoUsd, deudaFutura])
 
   const semaforo = useMemo(() => {
     if (!tc) return { label: 'Cargá el tipo de cambio para calcular', tone: 'warn' }
@@ -66,7 +82,7 @@ export default function Dashboard() {
     return { label: 'Frená — estás por debajo del ahorro objetivo', tone: 'bad' }
   }, [totales, tc])
 
-  const chartData = resumen
+  const chartData = datosFiltrados
     .filter((r) => r.tipo === 'Egreso' && Number(r.total_ars) > 0)
     .sort((a, b) => Number(b.total_ars) - Number(a.total_ars))
     .map((r) => ({ categoria: r.categoria, total: Number(r.total_ars) }))
@@ -247,6 +263,44 @@ export default function Dashboard() {
               </span>
             </div>
           </div>
+
+          {/* Toggle proyectos: solo se muestra si el mes tiene algún gasto de proyecto */}
+          {hayDatosDeProyecto && (
+            <div>
+              <label
+                className="
+                  block
+                  text-xs
+                  font-medium
+                  text-slate-500
+                  dark:text-slate-400
+                  mb-1.5
+                "
+              >
+                Gastos de proyectos (ej. Obra)
+              </label>
+
+              <button
+                onClick={() => setIncluirProyectos((v) => !v)}
+                className="
+                  rounded-lg
+                  border
+                  text-sm
+                  font-medium
+                  px-3
+                  py-1.5
+                  transition-colors
+                  border-slate-300
+                  dark:border-slate-700
+                  bg-white dark:bg-slate-800
+                  text-slate-700 dark:text-slate-200
+                  hover:bg-slate-50 dark:hover:bg-slate-700
+                "
+              >
+                {incluirProyectos ? 'Ocultar proyectos' : 'Incluir proyectos'}
+              </button>
+            </div>
+          )}
 
           {/* Aviso TC */}
           {!tcGuardado && (
@@ -430,7 +484,8 @@ export default function Dashboard() {
               </p>
 
               <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                Distribución de tus gastos durante el mes.
+                Distribución de tus gastos durante el mes
+                {!incluirProyectos && hayDatosDeProyecto ? ' (sin proyectos)' : ''}.
               </p>
             </div>
 

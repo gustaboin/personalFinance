@@ -267,3 +267,25 @@ export async function getMovimientosProyecto(id) {
   if (error) throw error
   return data ?? []
 }
+
+
+// funcion para prestamos (aca separo la hipoteca ya que es un gasto que me ensucia los movimientos corrientes)
+
+export async function getPrestamos() {
+  const { data, error } = await supabase
+    .from('prestamos')
+    .select('*')
+    .order('created_at')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function getCuotasPrestamo(id) {
+  const { data, error } = await supabase
+    .from('vw_prestamo_cuotas')
+    .select('*')
+    .eq('id_prestamo', id)
+    .order('nro_cuota')
+  if (error) throw error
+  return data ?? []
+}
