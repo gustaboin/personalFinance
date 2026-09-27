@@ -23,32 +23,60 @@ export default function Tarjetas() {
 
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
-
+  
   const imagenesMediosPago = {
     1: '/images/efectivo.png',
     2: '/images/mercadopago.png',
     3: '/images/transferencia.png',
     4: '/images/bna.png',
-    5: '/images/galicia2.png',
+    5: '/images/galiciaV.png',
     6: '/images/bbva.png',
+    7: '/images/bbva.png',
     8: '/images/ciudadM.png',
-    9: '/images/ciudad.png',
+    9: '/images/ciudadV.png',
     11: '/images/transferencia.png',
   }
 
   const coloresMediosPago = {
-    1: '#337ab7',
-    2: '#5cb85c',
-    3: '#f0ad4e',
+    1: '#5cb85c',
+    2: '#2abcff',
+    3: '#ffffff',
+    4: '#005f86',
+    5: ['#fa6400', '#bf2e3b'],
+    6: '#103667',
+    7: ['#005aa3', '#103667'],
+    8: ['#26abec', '#0c53a5'],
+    9: '#26abec',
+    11: '#ffffff',
   }
+
+  //const tarjetas = data.filter((m) => m.tipo_id === 4)
 
   useEffect(() => {
     getMediosPago().then((data) => {
+     
+      //  console.log("Medios de pago obtenidos:", data);
+    // 1. traigo toda la data de medios de pago y verifico si hay error
+    if (!data) return;
+
+    // 2. fgiltro solo los medios de pago que sean tarjetas (tipo_id === 4)
+    const tarjetasFiltradas = data.filter((m) => Number(m.tipo_id) === 4);
+
+    // 3. Guardo el estaado
+    setMedios(tarjetasFiltradas); 
+
+    // 4. seteo el id
+    if (tarjetasFiltradas.length > 0) {
+      setMedioId(String(tarjetasFiltradas[0].id));
+    }
+  }).catch((error) => {
+    // console.error("Error al obtener medios de pago:", error);
+     /*
       setMedios(data)
 
       if (data.length > 0) {
         setMedioId(String(data[0].id))
-      }
+      } */
     })
   }, [])
 
@@ -136,14 +164,19 @@ export default function Tarjetas() {
                     `
                 }
               `}
-              style={
-                activo
-                  ? {
-                      backgroundColor: color,
-                      borderColor: color,
-                    }
-                  : undefined
-              }
+style={
+  activo
+    ? Array.isArray(color)
+      ? {
+          background: `linear-gradient(to right, ${color[0]}, ${color[1]})`,
+          borderColor: color[0],
+        }
+      : {
+          backgroundColor: color,
+          borderColor: color,
+        }
+    : undefined
+}
             >
               {m.nombre}
             </button>

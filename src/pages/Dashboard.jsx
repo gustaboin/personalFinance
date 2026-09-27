@@ -26,6 +26,12 @@ export default function Dashboard() {
   // Toggle para incluir/excluir gastos de proyectos (ej. Obra) del resumen del mes
   const [incluirProyectos, setIncluirProyectos] = useState(false)
 
+  const colorStatCards = {
+    'Ingreso': '#10b981',
+    'Egreso': '#ef4444',
+    'Ahorro': '#3b82f6',
+  }
+
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -277,25 +283,16 @@ export default function Dashboard() {
                   mb-1.5
                 "
               >
-                Gastos de proyectos (ej. Obra)
+                Gastos de proyectos
               </label>
 
               <button
                 onClick={() => setIncluirProyectos((v) => !v)}
                 className="
-                  rounded-lg
-                  border
-                  text-sm
-                  font-medium
-                  px-3
-                  py-1.5
-                  transition-colors
-                  border-slate-300
-                  dark:border-slate-700
-                  bg-white dark:bg-slate-800
-                  text-slate-700 dark:text-slate-200
-                  hover:bg-slate-50 dark:hover:bg-slate-700
-                "
+                          rounded-xl text-sm font-medium px-4 py-2 
+                          transition-all duration-200 shadow-md shadow-[#fa6400]/20 active:scale-[0.98]
+                          bg-[#fa6400]/75 hover:bg-[#e05900] 
+                          text-slate-100 dark:text-slate-300"
               >
                 {incluirProyectos ? 'Ocultar proyectos' : 'Incluir proyectos'}
               </button>
@@ -356,7 +353,7 @@ export default function Dashboard() {
                   ? 'bg-emerald-600'
                   : semaforo.tone === 'bad'
                     ? 'bg-rose-600'
-                    : 'bg-amber-500'
+                    : 'bg-blue-400/75'
               }
             `}
           >
@@ -374,12 +371,14 @@ export default function Dashboard() {
           ================================================== */}
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-
+           
             <StatCard
               label="Ingresos"
               value={formatARS(
                 totales.ingresos
               )}
+              className="bg-sky-500/75" // por fin funciona
+              textColor="text-white-400 dark:text-emerald-200" 
             />
 
             <StatCard
@@ -387,6 +386,8 @@ export default function Dashboard() {
               value={formatARS(
                 totales.egresosSinAhorro
               )}
+              className="bg-red-400/75" 
+              textColor="text-white-800 dark:text-red-200" 
             />
 
             <StatCard
@@ -407,6 +408,8 @@ export default function Dashboard() {
                   ? 'good'
                   : 'warn'
               }
+              className="bg-cyan-600/75" // por fin funciona
+              textColor="text-white-800 dark:text-cyan-200" 
             />
 
             <StatCard
@@ -419,6 +422,13 @@ export default function Dashboard() {
                   ? 'good'
                   : 'bad'
               }
+              className={
+                totales.disponible >= 0
+                  ? 'bg-emerald-600/75'
+                  : 'bg-rose-600/75'
+              }
+              textColor="text-white-800 dark:text-white"
+              
             />
 
           </div>
