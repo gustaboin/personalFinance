@@ -139,13 +139,11 @@ export default function Movimientos() {
             <button
               type="button"
               onClick={cancelarEdicion}
-              className="
-                text-xs
-                text-slate-400
-                hover:text-slate-700
-                dark:text-slate-500
-                dark:hover:text-slate-200
-                transition
+              className="rounded-lg text-white text-sm font-medium px-4 py-2 disabled:opacity-50 col-span-1 transition
+                text-amber-950 
+                bg-amber-500
+                hover:bg-amber-600
+                active:bg-amber-700
               "
             >
               Cancelar edición
@@ -351,7 +349,7 @@ export default function Movimientos() {
             className={`rounded-lg text-white text-sm font-medium px-4 py-2 disabled:opacity-50 col-span-1 transition ${
               editandoId
                 ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500'
-                : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600'
+                : 'bg-[#009688] hover:bg-[#007f70] dark:bg-[#005f5f] dark:hover:bg-[#004a4a]'
             }`}
           >
             {guardando
