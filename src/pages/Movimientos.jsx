@@ -6,9 +6,10 @@ import {
   addMovimiento, updateMovimiento, deleteMovimiento,
 } from '../lib/api'
 import { Pencil, Trash2 } from 'lucide-react'
+import {getProveedores} from "../lib/api";
 
 const HOY = new Date().toISOString().slice(0, 10)
-const FORM_VACIO = { fecha: HOY, categoria_id: '', medio_pago_id: '', concepto: '', moneda: 'ARS', importe: '' }
+const FORM_VACIO = { fecha: HOY, id_proveedor: '', categoria_id: '', medio_pago_id: '', concepto: '', moneda: 'ARS', importe: '' }
 
 export default function Movimientos() {
   const [mesPeriodo, setMesPeriodo] = useState(currentMesPeriodo())
@@ -19,12 +20,13 @@ export default function Movimientos() {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState(null)
   const [editandoId, setEditandoId] = useState(null) // null = alta nueva, id = editando esa fila
-
+  const [proveedores, setProveedores] = useState([])
   const [form, setForm] = useState(FORM_VACIO)
 
   useEffect(() => {
     getCategorias().then(setCategorias)
     getMediosPago().then(setMedios)
+    getProveedores().then(setProveedores)
   }, [])
 
   useEffect(() => {
@@ -40,18 +42,19 @@ export default function Movimientos() {
     setMovimientos(data)
   }
 
-  function empezarEdicion(m) {
-    setEditandoId(m.id)
-    setForm({
-      fecha: m.fecha,
-      categoria_id: String(m.categoria_id ?? ''),
-      medio_pago_id: String(m.medio_pago_id ?? ''),
-      concepto: m.concepto || '',
-      moneda: m.moneda,
-      importe: String(m.importe),
-    })
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+function empezarEdicion(m) {
+  setEditandoId(m.id)
+  setForm({
+    fecha: m.fecha,
+    id_proveedor: String(m.id_proveedor ?? ''),
+    categoria_id: String(m.categoria_id ?? ''),
+    medio_pago_id: String(m.medio_pago_id ?? ''),
+    concepto: m.concepto || '',
+    moneda: m.moneda,
+    importe: String(m.importe),
+  })
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
   function cancelarEdicion() {
     setEditandoId(null)
@@ -70,6 +73,7 @@ export default function Movimientos() {
     try {
       const payload = {
         fecha: form.fecha,
+        id_proveedor: Number(form.id_proveedor) || null,
         categoria_id: Number(form.categoria_id),
         medio_pago_id: Number(form.medio_pago_id),
         concepto: form.concepto || null,
@@ -182,6 +186,40 @@ export default function Movimientos() {
               dark:focus:ring-slate-700
             "
           />
+          {/* Proveedor */}
+            <select
+              value={form.id_proveedor}
+              onChange={(e) =>
+                setForm({ ...form, id_proveedor: e.target.value })
+              }
+              className="
+                rounded-lg
+                border border-slate-300
+                bg-white
+                text-slate-900
+                px-3 py-2
+                text-sm
+                col-span-1
+            
+                focus:outline-none
+                focus:ring-2
+                focus:ring-slate-200
+            
+                dark:border-slate-700
+                dark:bg-slate-800
+                dark:text-slate-100
+                dark:focus:ring-slate-700
+              "
+            >
+              <option value="">Proveedor...</option>
+            
+              {proveedores.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+
 
           {/* Categoría */}
           <select
@@ -196,7 +234,7 @@ export default function Movimientos() {
               text-slate-900
               px-3 py-2
               text-sm
-              col-span-2
+              col-span-1
 
               focus:outline-none
               focus:ring-2

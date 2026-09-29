@@ -8,7 +8,15 @@ import {
   getMediosPago,
   getTotalTarjeta,
   getMovimientosTarjeta,
+  getResumenActualYAnterior,
+  agregarResumen,
 } from '../lib/api'
+
+function formatFecha(fecha) {
+  if (!fecha) return '—'
+  const d = new Date(fecha + 'T00:00:00')
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: '2-digit' })
+}
 
 export default function Tarjetas() {
   const [mesPeriodo, setMesPeriodo] = useState(currentMesPeriodo())
@@ -23,7 +31,19 @@ export default function Tarjetas() {
 
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
-  
+
+  // Resumen (cierre / vencimiento actual y anterior)
+  const [resumenActual, setResumenActual] = useState(null)
+  const [resumenAnterior, setResumenAnterior] = useState(null)
+  const [resumenLoading, setResumenLoading] = useState(false)
+
+  // Modal "Agregar resumen"
+  const [modalAbierto, setModalAbierto] = useState(false)
+  const [nuevoCierre, setNuevoCierre] = useState('')
+  const [nuevoVencimiento, setNuevoVencimiento] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [errorModal, setErrorModal] = useState('')
+
   const imagenesMediosPago = {
     1: '/images/efectivo.png',
     2: '/images/mercadopago.png',
@@ -50,33 +70,19 @@ export default function Tarjetas() {
     11: '#ffffff',
   }
 
-  //const tarjetas = data.filter((m) => m.tipo_id === 4)
-
   useEffect(() => {
     getMediosPago().then((data) => {
-     
-      //  console.log("Medios de pago obtenidos:", data);
-    // 1. traigo toda la data de medios de pago y verifico si hay error
-    if (!data) return;
+      if (!data) return
 
-    // 2. fgiltro solo los medios de pago que sean tarjetas (tipo_id === 4)
-    const tarjetasFiltradas = data.filter((m) => Number(m.tipo_id) === 4);
+      const tarjetasFiltradas = data.filter((m) => Number(m.tipo_id) === 4)
 
-    // 3. Guardo el estaado
-    setMedios(tarjetasFiltradas); 
+      setMedios(tarjetasFiltradas)
 
-    // 4. seteo el id
-    if (tarjetasFiltradas.length > 0) {
-      setMedioId(String(tarjetasFiltradas[0].id));
-    }
-  }).catch((error) => {
-    // console.error("Error al obtener medios de pago:", error);
-     /*
-      setMedios(data)
-
-      if (data.length > 0) {
-        setMedioId(String(data[0].id))
-      } */
+      if (tarjetasFiltradas.length > 0) {
+        setMedioId(String(tarjetasFiltradas[0].id))
+      }
+    }).catch(() => {
+      // noop
     })
   }, [])
 
@@ -108,6 +114,78 @@ export default function Tarjetas() {
       cancelled = true
     }
   }, [mesPeriodo, medioId])
+
+  // Trae el resumen activo + el anterior para la tarjeta seleccionada
+  function cargarResumenes() {
+     if (!medioId || medioId === '0') {
+    setResumenActual(null)
+    setResumenAnterior(null)
+    return
+  }
+
+  console.log('Cargando resumenes para medioId:', medioId, 'mesPeriodo:', mesPeriodo)
+
+    setResumenLoading(true)
+    
+  
+  // Transformamo el periodo de navegación (ej: "202609") a formato fecha (ej: "2026-09-01")
+  const año = mesPeriodo.slice(0, 4)
+  const mes = mesPeriodo.slice(4)
+  const periodoFormateado = `${año}-${mes}-01`
+  console.log('periodoFormateado:', periodoFormateado)
+  getResumenActualYAnterior(Number(medioId), periodoFormateado)
+    .then(({ actual, anterior }) => {
+      // Al navegar, actual tendrá el resumen del mes seleccionado y anterior será null
+      setResumenActual(actual)
+      setResumenAnterior(anterior) 
+      console.log('Resumen actual:', actual, 'Resumen anterior:', anterior)
+    })
+    .catch((err) => {
+      console.error('Error buscando cierre/vencimiento:', err)
+      setResumenActual(null)
+      setResumenAnterior(null)
+    })
+    .finally(() => setResumenLoading(false))
+  }
+
+  useEffect(() => {
+    cargarResumenes()
+  }, [medioId, mesPeriodo])
+
+  function abrirModal() {
+    setErrorModal('')
+    setNuevoCierre('')
+    setNuevoVencimiento('')
+    setModalAbierto(true)
+  }
+
+  function cerrarModal() {
+    if (guardando) return
+    setModalAbierto(false)
+  }
+
+  async function handleGuardarResumen(e) {
+    e.preventDefault()
+
+    if (!nuevoCierre || !nuevoVencimiento) {
+      setErrorModal('Completá fecha de cierre y de vencimiento.')
+      return
+    }
+
+    setGuardando(true)
+    setErrorModal('')
+
+    try {
+      await agregarResumen(Number(medioId), nuevoCierre, nuevoVencimiento)
+      setModalAbierto(false)
+      cargarResumenes()
+    } catch (err) {
+      console.error('Error al agregar resumen:', err)
+      setErrorModal('No se pudo guardar el resumen. Revisá los datos.')
+    } finally {
+      setGuardando(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -164,19 +242,19 @@ export default function Tarjetas() {
                     `
                 }
               `}
-style={
-  activo
-    ? Array.isArray(color)
-      ? {
-          background: `linear-gradient(to right, ${color[0]}, ${color[1]})`,
-          borderColor: color[0],
-        }
-      : {
-          backgroundColor: color,
-          borderColor: color,
-        }
-    : undefined
-}
+              style={
+                activo
+                  ? Array.isArray(color)
+                    ? {
+                        background: `linear-gradient(to right, ${color[0]}, ${color[1]})`,
+                        borderColor: color[0],
+                      }
+                    : {
+                        backgroundColor: color,
+                        borderColor: color,
+                      }
+                  : undefined
+              }
             >
               {m.nombre}
             </button>
@@ -355,6 +433,97 @@ style={
             </p>
           </div>
 
+          {/* Cierre / Vencimiento */}
+          <div
+            className="
+              flex-1
+              min-w-[220px]
+              px-4
+              py-3
+              rounded-lg
+              border
+              shadow-sm
+
+              bg-white
+              border-slate-200
+              text-slate-700
+
+              dark:bg-slate-800
+              dark:border-slate-700
+              dark:text-slate-200
+            "
+          >
+            <div className="flex items-center justify-between">
+              <p
+                className="
+                  text-xs
+                  font-medium
+                  uppercase
+                  tracking-wide
+                  text-slate-500
+                  dark:text-slate-400
+                "
+              >
+                Cierre / Vencimiento
+              </p>
+
+              <button
+                onClick={abrirModal}
+                disabled={!medioId}
+                title="Agregar resumen"
+                className="
+                  w-6 h-6
+                  flex items-center justify-center
+                  rounded-full
+                  text-white
+                  text-sm
+                  font-bold
+                  leading-none
+                  disabled:opacity-40
+                "
+                style={{ backgroundColor: '#337ab7' }}
+              >
+                +
+              </button>
+            </div>
+
+            {resumenLoading ? (
+              <p className="text-sm mt-2 text-slate-400">Cargando...</p>
+            ) : (
+              <div className="mt-2 space-y-1 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 dark:text-slate-400 w-12 shrink-0">
+                    Cierre
+                  </span>
+                  {/* comento por ahora el resumen anterior, porque no se está usando y genera confusión
+                  <span className="text-slate-400 dark:text-slate-500">
+                    {formatFecha(resumenAnterior?.fecha_cierre)}
+                  </span>
+                  */}
+                  <span className="text-slate-400">→</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {formatFecha(resumenActual?.fecha_cierre)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 dark:text-slate-400 w-12 shrink-0">
+                    Vto.
+                  </span>
+                  {/* comento por ahora el resumen anterior, porque no se está usando y genera confusión
+                  <span className="text-slate-400 dark:text-slate-500">
+                    {formatFecha(resumenAnterior?.fecha_vencimiento)}
+                  </span>
+                  */}
+                  <span className="text-slate-400">→</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {formatFecha(resumenActual?.fecha_vencimiento)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
 
@@ -521,6 +690,104 @@ style={
           </table>
         </div>
       </div>
+
+      {/* Modal: Agregar resumen */}
+      {modalAbierto && (
+        <div
+          className="
+            fixed inset-0 z-50
+            flex items-center justify-center
+            bg-black/50
+            p-4
+          "
+          onClick={cerrarModal}
+        >
+          <div
+            className="
+              w-full max-w-sm
+              bg-white
+              rounded-2xl
+              p-5
+              shadow-lg
+
+              dark:bg-slate-900
+              dark:border dark:border-slate-800
+            "
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-1 text-slate-900 dark:text-white">
+              Agregar resumen
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+              {medios.find((m) => String(m.id) === String(medioId))?.nombre}
+            </p>
+
+            <form onSubmit={handleGuardarResumen} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">
+                  Fecha de cierre
+                </label>
+                <input
+                  type="date"
+                  value={nuevoCierre}
+                  onChange={(e) => setNuevoCierre(e.target.value)}
+                  className="
+                    w-full px-3 py-2 rounded-lg border text-sm
+                    border-slate-200 text-slate-900
+                    dark:bg-slate-800 dark:border-slate-700 dark:text-white
+                  "
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">
+                  Fecha de vencimiento
+                </label>
+                <input
+                  type="date"
+                  value={nuevoVencimiento}
+                  onChange={(e) => setNuevoVencimiento(e.target.value)}
+                  className="
+                    w-full px-3 py-2 rounded-lg border text-sm
+                    border-slate-200 text-slate-900
+                    dark:bg-slate-800 dark:border-slate-700 dark:text-white
+                  "
+                />
+              </div>
+
+              {errorModal && (
+                <p className="text-sm text-red-500">{errorModal}</p>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={cerrarModal}
+                  disabled={guardando}
+                  className="
+                    px-3 py-1.5 rounded-lg text-sm font-medium
+                    text-slate-600 hover:bg-slate-100
+                    dark:text-slate-300 dark:hover:bg-slate-800
+                  "
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardando}
+                  className="
+                    px-3 py-1.5 rounded-lg text-sm font-medium text-white
+                    disabled:opacity-50
+                  "
+                  style={{ backgroundColor: '#337ab7' }}
+                >
+                  {guardando ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   )
