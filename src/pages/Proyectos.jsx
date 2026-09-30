@@ -504,19 +504,25 @@ export default function Proyectos() {
                   />
 
                   <YAxis
-                    type="category"
-                    dataKey="proveedor"
-                    width={130}
-                    fontSize={11}
+                  dataKey="proveedor" 
+                  type="category" 
+                  tick={{ fill: '#337ab7' }} // Equivalente a text-slate-200
+                  className="text-sm font-medium"
+                  width={180} 
                   />
 
                   <Tooltip
                     formatter={(v) => formatARS(v)}
                   />
-
+                     <defs>
+                      <linearGradient id="textGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#337ab7" />
+                        <stop offset="100%" stopColor="#60a5fa" />
+                      </linearGradient>
+                    </defs>
                   <Bar
                     dataKey="total"
-                    fill="#2563eb"
+                    fill= 'url(#textGradient)'
                     radius={[0, 6, 6, 0]}
                   />
 

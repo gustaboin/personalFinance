@@ -369,12 +369,18 @@ export default function Prestamos() {
                   />
 
                   <Legend />
+                  <defs>
+                      <linearGradient id="textGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#337ab7" />
+                        <stop offset="100%" stopColor="#60a5fa" />
+                      </linearGradient>
+                    </defs>
 
                   <Bar
                     yAxisId="ars"
                     dataKey="monto_ars"
                     name="Monto ($)"
-                    fill="#2563eb"
+                    fill= 'url(#textGradient)'
                     radius={[4, 4, 0, 0]}
                   />
 
@@ -429,7 +435,7 @@ export default function Prestamos() {
                   <Bar
                     dataKey="incremento_cuota"
                     name="Incremento cuota ($)"
-                    fill="#2563eb"
+                    fill= 'url(#textGradient)'
                     radius={[4, 4, 0, 0]}
                   />
 

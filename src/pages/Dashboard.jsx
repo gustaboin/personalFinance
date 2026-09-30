@@ -26,12 +26,6 @@ export default function Dashboard() {
   // Toggle para incluir/excluir gastos de proyectos (ej. Obra) del resumen del mes
   const [incluirProyectos, setIncluirProyectos] = useState(false)
 
-  const colorStatCards = {
-    'Ingreso': '#10b981',
-    'Egreso': '#ef4444',
-    'Ahorro': '#3b82f6',
-  }
-
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -377,8 +371,9 @@ export default function Dashboard() {
               value={formatARS(
                 totales.ingresos
               )}
-              className="bg-sky-500/75" // por fin funciona
+              className="bg-[#5cb85c]" // por fin funciona
               textColor="text-white-400 dark:text-emerald-200" 
+              
             />
 
             <StatCard
@@ -386,7 +381,7 @@ export default function Dashboard() {
               value={formatARS(
                 totales.egresosSinAhorro
               )}
-              className="bg-red-400/75" 
+              className="bg-red-600/75" // por fin funciona
               textColor="text-white-800 dark:text-red-200" 
             />
 
@@ -408,7 +403,7 @@ export default function Dashboard() {
                   ? 'good'
                   : 'warn'
               }
-              className="bg-cyan-600/75" // por fin funciona
+              className="bg-[#337ab7]" // por fin funciona
               textColor="text-white-800 dark:text-cyan-200" 
             />
 
@@ -555,10 +550,16 @@ export default function Dashboard() {
                       color: '#fff',
                     }}
                   />
-
+                  {/*/ agregue un gradiente para el color de las barras */}
+                   <defs>
+                      <linearGradient id="textGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#337ab7" />
+                        <stop offset="100%" stopColor="#60a5fa" />
+                      </linearGradient>
+                    </defs>
                   <Bar
                     dataKey="total"
-                    fill="#3b82f6"
+                    fill= 'url(#textGradient)'
                     radius={[
                       0,
                       6,
