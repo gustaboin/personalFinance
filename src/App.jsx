@@ -9,6 +9,7 @@ import Evolucion from './pages/Evolucion'
 import Tarjetas from './pages/Tarjetas'
 import Proyectos from './pages/Proyectos'
 import Prestamos from './pages/Prestamos'
+import Config from './pages/Config'
 
 import {
   LayoutDashboard,
@@ -20,6 +21,8 @@ import {
   FolderTree,
   Sun,
   Moon,
+  Cog,
+  LogOut,
 } from 'lucide-react'
 
 const TABS = [
@@ -32,6 +35,9 @@ const TABS = [
   { id: 'proyectos', label: 'Proyectos', icon: FolderTree, component: Proyectos },
   { id: 'prestamos', label: 'Prestamos', icon: CreditCard, component: Prestamos },
 ]
+
+// Config fuera del menú de tabs: es administración
+const CONFIG_TAB = { id: 'config', label: 'Config', icon: Cog, component: Config }
 
 function Shell() {
   const { session, signOut } = useAuth()
@@ -55,8 +61,13 @@ function Shell() {
     }
   }, [darkMode])
 
+  // El tab activo puede ser uno de TABS o el de Config (que vive aparte)
   const ActiveComponent =
-    TABS.find((t) => t.id === tab)?.component ?? Dashboard
+    tab === CONFIG_TAB.id
+      ? CONFIG_TAB.component
+      : TABS.find((t) => t.id === tab)?.component ?? Dashboard
+
+  const enConfig = tab === CONFIG_TAB.id
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100">
@@ -81,7 +92,7 @@ function Shell() {
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pr-4">
 
             <span className="text-xs text-slate-400 hidden sm:block">
               {session?.user?.email}
@@ -105,17 +116,30 @@ function Shell() {
               )}
             </button>
 
+            {/* Botón Config (tuerquita), separado del menú de tabs */}
             <button
-              onClick={signOut}
-              className="text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
+              onClick={() => setTab(CONFIG_TAB.id)}
+              title="Configuración"
+              className={`h-9 w-9 flex items-center justify-center rounded-lg transition-colors ${
+                enConfig
+                  ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
+              }`}
             >
-              Salir
+              <Cog size={18} strokeWidth={2} />
             </button>
 
+            <button
+                onClick={signOut}
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
+              >
+                <LogOut size={16} strokeWidth={2} />
+                Salir
+              </button>
           </div>
         </div>
 
-        {/* Menú */}
+        {/* Menú de tabs de uso diario (Config no vive acá) */}
         <div className="border-t border-slate-100 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/50">
           <nav className="max-w-5xl mx-auto px-4 py-2 overflow-x-auto">
             <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
