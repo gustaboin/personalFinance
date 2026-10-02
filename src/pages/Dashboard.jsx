@@ -28,6 +28,10 @@ export default function Dashboard() {
   const [cotizacion, setCotizacion] = useState(null); // { fecha, valorventa } | null
   const [objetivoUsd, setObjetivoUsd] = useState(OBJETIVO_AHORRO_USD_DEFAULT);
   const [loading, setLoading] = useState(true);
+  const [saldoProp, setSaldoProp] = useState(true); // Estado para controlar la visibilidad del detalle de cuentas en el Dashboard (por defecto oculto: false)
+
+  // Estado para controlar la visibilidad del detalle de cuentas en el Dashboard (por defecto oculto: true)
+  //const [soloSaldoDashboard, setSoloSaldoDashboard] = useState(true);
 
   // Toggle para incluir/excluir gastos de proyectos (ej. Obra) del resumen del mes
   const [incluirProyectos, setIncluirProyectos] = useState(false);
@@ -141,7 +145,7 @@ export default function Dashboard() {
       </div>
 
       {/* =====================================================
-          SALDOS DE CUENTAS (vista compacta)
+          SALDOS DE CUENTAS (vista compacta / toggle)
       ====================================================== */}
 
       <div
@@ -157,10 +161,14 @@ export default function Dashboard() {
           dark:shadow-black/20
         "
       >
-        <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-3">
-          Saldos
-        </p>
-        <SaldosPanel compact={true} />
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            Saldos
+          </p>
+        </div>
+
+        {/* Pasamos la prop de control al componente SaldosPanel */}
+        <SaldosPanel compact={false} soloSaldoProp={saldoProp} />
       </div>
 
       {/* =====================================================
