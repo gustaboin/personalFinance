@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -11,166 +13,211 @@ import {
   Pie,
   Cell,
   Legend,
-} from 'recharts'
+} from "recharts";
 
-import { formatARS } from '../lib/format'
-import { getProyectos, getResumenProyecto, getMovimientosProyecto } from '../lib/api'
+import { formatARS } from "../lib/format";
+import {
+  getProyectos,
+  getResumenProyecto,
+  getMovimientosProyecto,
+  getEvolucionProyecto,
+} from "../lib/api";
 
 const COLORES = [
-  '#2563eb',
-  '#059669',
-  '#f59e0b',
-  '#dc2626',
-  '#7c3aed',
-  '#0891b2',
-  '#db2777',
-  '#65a30d',
-]
+  "#2563eb",
+  "#059669",
+  "#f59e0b",
+  "#dc2626",
+  "#7c3aed",
+  "#0891b2",
+  "#db2777",
+  "#65a30d",
+];
+
+function formatUSD(v) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(v ?? 0);
+}
+
+function mesLabel(mesPeriodo) {
+  // "202609" -> "Sep 26"
+  const anio = mesPeriodo.slice(2, 4);
+  const mes = Number(mesPeriodo.slice(4, 6));
+  const nombres = [
+    "Ene",
+    "Feb",
+    "Mar",
+    "Abr",
+    "May",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dic",
+  ];
+  return `${nombres[mes - 1]} ${anio}`;
+}
 
 export default function Proyectos() {
-  const [proyectos, setProyectos] = useState([])
-  const [proyectoId, setProyectoId] = useState('')
-  const [resumen, setResumen] = useState(null)
-  const [movimientos, setMovimientos] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [proyectos, setProyectos] = useState([]);
+  const [proyectoId, setProyectoId] = useState("");
+  const [resumen, setResumen] = useState(null);
+  const [movimientos, setMovimientos] = useState([]);
+  const [evolucion, setEvolucion] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [oculto, setOculto] = useState(false); // false para que arranque abierto
+  // Toggle de moneda para el gráfico de evolución
+  const [monedaVista, setMonedaVista] = useState("USD");
 
   // Filtros y paginado de la tabla de movimientos
-  const [filtroProveedor, setFiltroProveedor] = useState('')
-  const [filtroRubro, setFiltroRubro] = useState('')
-  const [visibleCount, setVisibleCount] = useState(20)
+  const [filtroProveedor, setFiltroProveedor] = useState("");
+  const [filtroRubro, setFiltroRubro] = useState("");
+  const [visibleCount, setVisibleCount] = useState(20);
 
   // Carga inicial: listado de proyectos
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     getProyectos()
       .then((data) => {
-        if (cancelled) return
+        if (cancelled) return;
 
-        setProyectos(data)
+        setProyectos(data);
 
-        const activo = data.find((p) => p.estado === 'ACTIVO')
+        const activo = data.find((p) => p.estado === "ACTIVO");
 
         if (activo) {
-          setProyectoId(String(activo.id))
+          setProyectoId(String(activo.id));
         } else if (data.length > 0) {
-          setProyectoId(String(data[0].id))
+          setProyectoId(String(data[0].id));
         } else {
-          // No hay proyectos todavía: cortamos el loading para mostrar el estado vacío
-          setLoading(false)
+          setLoading(false);
         }
       })
       .catch((err) => {
-        if (cancelled) return
-        console.error('Error cargando proyectos:', err)
-        setError('No se pudieron cargar los proyectos.')
-        setLoading(false)
-      })
+        if (cancelled) return;
+        console.error("Error cargando proyectos:", err);
+        setError("No se pudieron cargar los proyectos.");
+        setLoading(false);
+      });
 
     return () => {
-      cancelled = true
-    }
-  }, [])
+      cancelled = true;
+    };
+  }, []);
 
-  // Carga de resumen + movimientos cuando cambia el proyecto seleccionado
+  // Carga de resumen + movimientos + evolución cuando cambia el proyecto seleccionado
   useEffect(() => {
-    if (!proyectoId) return
+    if (!proyectoId) return;
 
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    setFiltroProveedor('')
-    setFiltroRubro('')
-    setVisibleCount(20)
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setFiltroProveedor("");
+    setFiltroRubro("");
+    setVisibleCount(20);
 
     Promise.all([
       getResumenProyecto(Number(proyectoId)),
       getMovimientosProyecto(Number(proyectoId)),
+      getEvolucionProyecto(Number(proyectoId)),
     ])
-      .then(([resumenData, movimientosData]) => {
-        if (cancelled) return
-        setResumen(resumenData)
-        setMovimientos(movimientosData)
+      .then(([resumenData, movimientosData, evolucionData]) => {
+        if (cancelled) return;
+        setResumen(resumenData);
+        setMovimientos(movimientosData);
+        setEvolucion(evolucionData);
       })
       .catch((err) => {
-        if (cancelled) return
-        console.error('Error cargando resumen del proyecto:', err)
-        setError('No se pudo cargar el resumen del proyecto.')
+        if (cancelled) return;
+        console.error("Error cargando resumen del proyecto:", err);
+        setError("No se pudo cargar el resumen del proyecto.");
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+        if (!cancelled) setLoading(false);
+      });
 
     return () => {
-      cancelled = true
-    }
-  }, [proyectoId])
+      cancelled = true;
+    };
+  }, [proyectoId]);
 
-  const proyecto = proyectos.find((p) => String(p.id) === String(proyectoId))
+  const proyecto = proyectos.find((p) => String(p.id) === String(proyectoId));
 
   const porcentaje = useMemo(() => {
-    if (!resumen?.presupuesto) return 0
-    return Math.min(100, (resumen.gastado / resumen.presupuesto) * 100)
-  }, [resumen])
+    if (!resumen?.presupuesto) return 0;
+    return Math.min(100, (resumen.gastado / resumen.presupuesto) * 100);
+  }, [resumen]);
 
-  // Opciones únicas para los selects de filtro, sacadas de los movimientos ya cargados
   const proveedoresUnicos = useMemo(() => {
-    const set = new Set(movimientos.map((m) => m.proveedor).filter(Boolean))
-    return Array.from(set).sort()
-  }, [movimientos])
+    const set = new Set(movimientos.map((m) => m.proveedor).filter(Boolean));
+    return Array.from(set).sort();
+  }, [movimientos]);
 
   const rubrosUnicos = useMemo(() => {
-    const set = new Set(movimientos.map((m) => m.rubro).filter(Boolean))
-    return Array.from(set).sort()
-  }, [movimientos])
+    const set = new Set(movimientos.map((m) => m.rubro).filter(Boolean));
+    return Array.from(set).sort();
+  }, [movimientos]);
 
   const movimientosFiltrados = useMemo(() => {
     return movimientos.filter((m) => {
-      if (filtroProveedor && m.proveedor !== filtroProveedor) return false
-      if (filtroRubro && m.rubro !== filtroRubro) return false
-      return true
-    })
-  }, [movimientos, filtroProveedor, filtroRubro])
+      if (filtroProveedor && m.proveedor !== filtroProveedor) return false;
+      if (filtroRubro && m.rubro !== filtroRubro) return false;
+      return true;
+    });
+  }, [movimientos, filtroProveedor, filtroRubro]);
 
-  // Si cambia un filtro, volvemos a mostrar los primeros N
   useEffect(() => {
-    setVisibleCount(20)
-  }, [filtroProveedor, filtroRubro])
+    setVisibleCount(20);
+  }, [filtroProveedor, filtroRubro]);
 
-  // --- Estados de carga / error / vacío ---
+  const evolucionChart = useMemo(() => {
+    return evolucion.map((e) => ({
+      mes: mesLabel(e.mes_periodo),
+      valor: monedaVista === "ARS" ? Number(e.total_ars) : Number(e.total_usd),
+    }));
+  }, [evolucion, monedaVista]);
+
+  const totalEvolucion = useMemo(() => {
+    return evolucion.reduce(
+      (acc, e) => ({
+        ars: acc.ars + Number(e.total_ars),
+        usd: acc.usd + Number(e.total_usd),
+      }),
+      { ars: 0, usd: 0 },
+    );
+  }, [evolucion]);
 
   if (error) {
     return (
       <div className="rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 p-4 text-sm text-rose-600 dark:text-rose-400">
         {error}
       </div>
-    )
+    );
   }
 
   if (loading && !resumen) {
-    return (
-      <div className="text-sm text-slate-400">
-        Cargando proyecto...
-      </div>
-    )
+    return <div className="text-sm text-slate-400">Cargando proyecto...</div>;
   }
 
   if (!loading && proyectos.length === 0) {
     return (
       <div className="text-sm text-slate-400">
-        Todavía no creaste ningún proyecto. Cargá uno en la tabla{' '}
+        Todavía no creaste ningún proyecto. Cargá uno en la tabla{" "}
         <code>proyectos</code> para empezar.
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-6">
-
       {/* ENCABEZADO */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-
         <div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
             Proyectos
@@ -200,72 +247,72 @@ export default function Proyectos() {
             </option>
           ))}
         </select>
-
       </div>
-
 
       {proyecto && resumen && (
         <>
-
           {/* RESUMEN PRINCIPAL */}
-          <div className="
+          <div
+            className="
             bg-white dark:bg-slate-900
             border border-slate-200 dark:border-slate-800
             rounded-2xl
             p-5
             shadow-sm
-          ">
-
+          "
+          >
             <div className="flex flex-wrap items-start justify-between gap-4">
-
               <div>
                 <div className="flex items-center gap-2">
-
-                  <h3 className="
+                  <h3
+                    className="
                     text-xl font-bold
                     text-slate-900 dark:text-white
-                  ">
+                  "
+                  >
                     {proyecto.nombre}
                   </h3>
 
-                  <span className={`
+                  <span
+                    className={`
                     px-2 py-1
                     rounded-full
                     text-xs font-medium
                     ${
-                      proyecto.estado === 'ACTIVO'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                      proyecto.estado === "ACTIVO"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
+                        : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
                     }
-                  `}>
+                  `}
+                  >
                     {proyecto.estado}
                   </span>
-
                 </div>
 
                 {proyecto.descripcion && (
-                  <p className="
+                  <p
+                    className="
                     text-sm
                     text-slate-500 dark:text-slate-400
                     mt-1
-                  ">
+                  "
+                  >
                     {proyecto.descripcion}
                   </p>
                 )}
               </div>
-
             </div>
 
-
             {/* KPIs */}
-            <div className="
+            <div
+              className="
               grid
               grid-cols-2
               md:grid-cols-4
               gap-3
               mt-6
-            ">
-
+            "
+            >
               <div className="rounded-xl bg-slate-50 dark:bg-slate-800 p-4">
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Presupuesto
@@ -291,14 +338,16 @@ export default function Proyectos() {
                   Disponible
                 </p>
 
-                <p className={`
+                <p
+                  className={`
                   text-xl font-bold mt-1
                   ${
                     resumen.disponible >= 0
-                      ? 'text-emerald-600'
-                      : 'text-rose-600'
+                      ? "text-emerald-600"
+                      : "text-rose-600"
                   }
-                `}>
+                `}
+                >
                   {formatARS(resumen.disponible)}
                 </p>
               </div>
@@ -312,65 +361,156 @@ export default function Proyectos() {
                   {porcentaje.toFixed(1)}%
                 </p>
               </div>
-
             </div>
-
 
             {/* BARRA PRESUPUESTO */}
             {resumen.presupuesto > 0 && (
               <div className="mt-5">
-
-                <div className="
+                <div
+                  className="
                   h-3
                   rounded-full
                   bg-slate-100 dark:bg-slate-800
                   overflow-hidden
-                ">
+                "
+                >
                   <div
                     className={`
                       h-full rounded-full transition-all
                       ${
                         porcentaje >= 100
-                          ? 'bg-rose-500'
+                          ? "bg-rose-500"
                           : porcentaje >= 80
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500'
+                            ? "bg-amber-500"
+                            : "bg-emerald-500"
                       }
                     `}
                     style={{ width: `${porcentaje}%` }}
                   />
                 </div>
 
-                <div className="
+                <div
+                  className="
                   flex justify-between
                   text-xs
                   text-slate-400
                   mt-2
-                ">
+                "
+                >
                   <span>0%</span>
                   <span>100%</span>
                 </div>
-
               </div>
             )}
-
           </div>
 
+          {/* EVOLUCIÓN MENSUAL — con toggle ARS/USD y Ocultar/Mostrar */}
+          <div className="  bg-white dark:bg-slate-900  border border-slate-200 dark:border-slate-800  rounded-2xl  p-5  shadow-sm">
+            {/* Cabecera principal (Siempre visible para ver el título y el botón) */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p
+                  className="
+        text-sm font-medium
+        text-slate-700 dark:text-slate-200
+      "
+                >
+                  Evolución mensual
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Total{" "}
+                  {monedaVista === "ARS"
+                    ? "Ars " + formatARS(totalEvolucion.ars)
+                    : "u$s " + formatUSD(totalEvolucion.usd)}{" "}
+                  acumulado
+                </p>
+              </div>
+
+              {/* Contenedor derecho: Toggle de moneda + Botón Ocultar/Mostrar */}
+              <div className="flex items-center gap-2">
+                <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  {["ARS", "USD"].map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setMonedaVista(m)}
+                      className={`
+              px-3 py-1.5 text-xs font-medium transition
+              ${
+                monedaVista === m
+                  ? "bg-emerald-500 text-white dark:bg-emerald-500 dark:text-slate-100"
+                  : "bg-white text-slate-500 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
+              }
+            `}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Botón para colapsar / expandir */}
+                <button
+                  onClick={() => setOculto(!oculto)}
+                  className="px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-lg transition"
+                >
+                  {oculto ? "Mostrar" : "Ocultar"}
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido colapsable (Gráfico y mensaje de "sin movimientos") */}
+            {!oculto && (
+              <div className="mt-4">
+                {evolucionChart.length === 0 ? (
+                  <p className="text-sm text-slate-400">
+                    Todavía no hay movimientos para graficar.
+                  </p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={evolucionChart}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="mes" fontSize={11} />
+                      <YAxis
+                        fontSize={11}
+                        tickFormatter={(v) =>
+                          monedaVista === "ARS" ? formatARS(v) : formatUSD(v)
+                        }
+                      />
+                      <Tooltip
+                        formatter={(v) =>
+                          monedaVista === "ARS" ? formatARS(v) : formatUSD(v)
+                        }
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="valor"
+                        stroke="#2563eb"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* DISTRIBUCIÓN */}
-          <div className="
+          <div
+            className="
             bg-white dark:bg-slate-900
             border border-slate-200 dark:border-slate-800
             rounded-2xl
             p-5
             shadow-sm
-          ">
-
-            <p className="
+          "
+          >
+            <p
+              className="
               text-sm font-medium
               text-slate-700 dark:text-slate-200
               mb-4
-            ">
+            "
+            >
               ¿En qué se gastó?
             </p>
 
@@ -380,10 +520,8 @@ export default function Proyectos() {
               </p>
             ) : (
               <div className="grid md:grid-cols-2 gap-6">
-
                 <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
-
                     <Pie
                       data={resumen.porRubro}
                       dataKey="total"
@@ -400,18 +538,13 @@ export default function Proyectos() {
                       ))}
                     </Pie>
 
-                    <Tooltip
-                      formatter={(value) => formatARS(value)}
-                    />
+                    <Tooltip formatter={(value) => formatARS(value)} />
 
                     <Legend />
-
                   </PieChart>
                 </ResponsiveContainer>
 
-
                 <div className="space-y-2">
-
                   {resumen.porRubro.map((r, i) => (
                     <div
                       key={r.rubro}
@@ -422,58 +555,56 @@ export default function Proyectos() {
                         bg-slate-50 dark:bg-slate-800
                       "
                     >
-
                       <div className="flex items-center gap-2">
-
                         <span
                           className="w-3 h-3 rounded-full"
                           style={{
-                            backgroundColor:
-                              COLORES[i % COLORES.length],
+                            backgroundColor: COLORES[i % COLORES.length],
                           }}
                         />
 
-                        <span className="
+                        <span
+                          className="
                           text-sm
                           text-slate-700 dark:text-slate-300
-                        ">
+                        "
+                        >
                           {r.rubro}
                         </span>
-
                       </div>
 
-                      <span className="
+                      <span
+                        className="
                         text-sm font-medium
                         text-slate-900 dark:text-white
-                      ">
+                      "
+                      >
                         {formatARS(r.total)}
                       </span>
-
                     </div>
                   ))}
-
                 </div>
-
               </div>
             )}
-
           </div>
 
-
           {/* PROVEEDORES */}
-          <div className="
+          <div
+            className="
             bg-white dark:bg-slate-900
             border border-slate-200 dark:border-slate-800
             rounded-2xl
             p-5
             shadow-sm
-          ">
-
-            <p className="
+          "
+          >
+            <p
+              className="
               text-sm font-medium
               text-slate-700 dark:text-slate-200
               mb-4
-            ">
+            "
+            >
               Principales proveedores
             </p>
 
@@ -491,11 +622,7 @@ export default function Proyectos() {
                   layout="vertical"
                   margin={{ left: 20, right: 20 }}
                 >
-
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    horizontal={false}
-                  />
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
 
                   <XAxis
                     type="number"
@@ -504,64 +631,70 @@ export default function Proyectos() {
                   />
 
                   <YAxis
-                  dataKey="proveedor" 
-                  type="category" 
-                  tick={{ fill: '#337ab7' }} // Equivalente a text-slate-200
-                  className="text-sm font-medium"
-                  width={180} 
+                    dataKey="proveedor"
+                    type="category"
+                    tick={{ fill: "#337ab7" }} // Equivalente a text-slate-200
+                    className="text-sm font-medium"
+                    width={180}
                   />
 
-                  <Tooltip
-                    formatter={(v) => formatARS(v)}
-                  />
-                     <defs>
-                      <linearGradient id="textGradient" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#337ab7" />
-                        <stop offset="100%" stopColor="#60a5fa" />
-                      </linearGradient>
-                    </defs>
+                  <Tooltip formatter={(v) => formatARS(v)} />
+                  <defs>
+                    <linearGradient
+                      id="textGradient"
+                      x1="0"
+                      y1="0"
+                      x2="1"
+                      y2="0"
+                    >
+                      <stop offset="0%" stopColor="#337ab7" />
+                      <stop offset="100%" stopColor="#60a5fa" />
+                    </linearGradient>
+                  </defs>
                   <Bar
                     dataKey="total"
-                    fill= 'url(#textGradient)'
+                    fill="url(#textGradient)"
                     radius={[0, 6, 6, 0]}
                   />
-
                 </BarChart>
               </ResponsiveContainer>
             )}
-
           </div>
 
-
           {/* MOVIMIENTOS */}
-          <div className="
+          <div
+            className="
             bg-white dark:bg-slate-900
             border border-slate-200 dark:border-slate-800
             rounded-2xl
             shadow-sm
             overflow-hidden
-          ">
-
-            <div className="
+          "
+          >
+            <div
+              className="
               px-5 py-4
               border-b border-slate-200 dark:border-slate-800
               flex flex-wrap items-center justify-between gap-3
-            ">
-              <p className="
+            "
+            >
+              <p
+                className="
                 text-sm font-medium
                 text-slate-700 dark:text-slate-200
-              ">
+              "
+              >
                 Movimientos
                 {(filtroProveedor || filtroRubro) && (
                   <span className="text-slate-400 font-normal">
-                    {' '}({movimientosFiltrados.length} de {movimientos.length})
+                    {" "}
+                    ({movimientosFiltrados.length} de {movimientos.length})
                   </span>
                 )}
               </p>
 
               {movimientos.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-
                   <select
                     value={filtroRubro}
                     onChange={(e) => setFiltroRubro(e.target.value)}
@@ -576,7 +709,9 @@ export default function Proyectos() {
                   >
                     <option value="">Todos los rubros</option>
                     {rubrosUnicos.map((r) => (
-                      <option key={r} value={r}>{r}</option>
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
                     ))}
                   </select>
 
@@ -594,15 +729,17 @@ export default function Proyectos() {
                   >
                     <option value="">Todos los proveedores</option>
                     {proveedoresUnicos.map((p) => (
-                      <option key={p} value={p}>{p}</option>
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
                     ))}
                   </select>
 
                   {(filtroProveedor || filtroRubro) && (
                     <button
                       onClick={() => {
-                        setFiltroProveedor('')
-                        setFiltroRubro('')
+                        setFiltroProveedor("");
+                        setFiltroRubro("");
                       }}
                       className="
                         text-xs
@@ -614,7 +751,6 @@ export default function Proyectos() {
                       Limpiar
                     </button>
                   )}
-
                 </div>
               )}
             </div>
@@ -629,113 +765,109 @@ export default function Proyectos() {
               </p>
             ) : (
               <>
-              <table className="w-full text-sm">
-
-                <thead className="
+                <table className="w-full text-sm">
+                  <thead
+                    className="
                   bg-slate-50 dark:bg-slate-800
                   text-slate-500 dark:text-slate-300
                   text-xs uppercase
-                ">
-                  <tr>
-                    <th className="text-left px-4 py-2">
-                      Fecha
-                    </th>
+                "
+                  >
+                    <tr>
+                      <th className="text-left px-4 py-2">Fecha</th>
 
-                    <th className="text-left px-4 py-2">
-                      Concepto
-                    </th>
+                      <th className="text-left px-4 py-2">Concepto</th>
 
-                    <th className="text-left px-4 py-2">
-                      Rubro
-                    </th>
+                      <th className="text-left px-4 py-2">Rubro</th>
 
-                    <th className="text-left px-4 py-2">
-                      Proveedor
-                    </th>
+                      <th className="text-left px-4 py-2">Proveedor</th>
 
-                    <th className="text-right px-4 py-2">
-                      Importe
-                    </th>
-                  </tr>
-                </thead>
+                      <th className="text-right px-4 py-2">Importe</th>
+                    </tr>
+                  </thead>
 
-                <tbody>
-
-                  {movimientosFiltrados.slice(0, visibleCount).map((m, idx) => (
-                    <tr
-                      key={`${m.fecha}-${m.concepto}-${idx}`}
-                      className="
+                  <tbody>
+                    {movimientosFiltrados
+                      .slice(0, visibleCount)
+                      .map((m, idx) => (
+                        <tr
+                          key={`${m.fecha}-${m.concepto}-${idx}`}
+                          className="
                         border-t border-slate-100
                         dark:border-slate-800
                       "
-                    >
-
-                      <td className="
+                        >
+                          <td
+                            className="
                         px-4 py-2
                         whitespace-nowrap
                         text-slate-700 dark:text-slate-300
-                      ">
-                        {m.fecha}
-                      </td>
+                      "
+                          >
+                            {m.fecha}
+                          </td>
 
-                      <td className="
+                          <td
+                            className="
                         px-4 py-2
                         text-slate-700 dark:text-slate-300
-                      ">
-                        {m.concepto}
-                      </td>
+                      "
+                          >
+                            {m.concepto}
+                          </td>
 
-                      <td className="
+                          <td
+                            className="
                         px-4 py-2
                         text-slate-500 dark:text-slate-400
-                      ">
-                        {m.rubro ?? '—'}
-                      </td>
+                      "
+                          >
+                            {m.rubro ?? "—"}
+                          </td>
 
-                      <td className="
+                          <td
+                            className="
                         px-4 py-2
                         text-slate-500 dark:text-slate-400
-                      ">
-                        {m.proveedor ?? '—'}
-                      </td>
+                      "
+                          >
+                            {m.proveedor ?? "—"}
+                          </td>
 
-                      <td className="
+                          <td
+                            className="
                         px-4 py-2
                         text-right font-medium
                         text-slate-900 dark:text-white
-                      ">
-                        {formatARS(m.importe)}
-                      </td>
+                      "
+                          >
+                            {formatARS(m.importe)}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
 
-                    </tr>
-                  ))}
-
-                </tbody>
-
-              </table>
-
-              {visibleCount < movimientosFiltrados.length && (
-                <div className="flex justify-center py-4 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    onClick={() => setVisibleCount((c) => c + 20)}
-                    className="
+                {visibleCount < movimientosFiltrados.length && (
+                  <div className="flex justify-center py-4 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      onClick={() => setVisibleCount((c) => c + 20)}
+                      className="
                       text-sm font-medium
                       text-blue-600 dark:text-blue-400
                       hover:underline
                     "
-                  >
-                    Mostrar más ({movimientosFiltrados.length - visibleCount} restantes)
-                  </button>
-                </div>
-              )}
+                    >
+                      Mostrar más ({movimientosFiltrados.length - visibleCount}{" "}
+                      restantes)
+                    </button>
+                  </div>
+                )}
               </>
             )}
-
           </div>
-
         </>
       )}
-
     </div>
-  )
+  );
 }

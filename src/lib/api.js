@@ -346,6 +346,14 @@ export async function getMovimientosProyecto(id) {
   return data ?? []
 }
 
+// 2026-10-02 agrego una funcion para ver la evolucion del proyecto, y tener el gasto ne moneda extranjera (USD)
+
+export async function getEvolucionProyecto(id) {
+  const { data, error } = await supabase.rpc('resumen_proyecto_evolucion', { p_proyecto_id: id })
+  if (error) throw error
+  return data ?? []
+}
+
 
 // funcion para prestamos (aca separo la hipoteca ya que es un gasto que me ensucia los movimientos corrientes)
 
