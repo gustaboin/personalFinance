@@ -4,6 +4,13 @@ import {
   addTransferencia,
   getTransferenciasRecientes,
 } from "../lib/cuentasApi";
+import {
+  Landmark,
+  Smartphone,
+  DollarSign,
+  Bus,
+  TrendingUp,
+} from "lucide-react";
 
 function formatMoneda(valor, moneda) {
   const m = moneda || "ARS";
@@ -14,12 +21,18 @@ function formatMoneda(valor, moneda) {
 }
 
 const ICONO_TIPO = {
-  banco: "🏦",
-  billetera: "📱",
-  efectivo: "💵",
-  prepaga: "🚌",
-  broker: "📈",
+  banco: { icon: Landmark, color: "text-blue-600 dark:text-blue-400" },
+  billetera: { icon: Smartphone, color: "text-green-600 dark:text-green-400" },
+  efectivo: { icon: DollarSign, color: "text-yellow-600 dark:text-yellow-400" },
+  prepaga: { icon: Bus, color: "text-purple-600 dark:text-purple-400" },
+  broker: { icon: TrendingUp, color: "text-red-600 dark:text-red-400" },
 };
+
+// Devuelve el componente de ícono + color para un tipo de cuenta, con fallback
+// por si aparece un tipo nuevo que todavía no está en ICONO_TIPO.
+function iconoDeCuenta(tipo) {
+  return ICONO_TIPO[tipo] ?? { icon: null, color: "text-slate-400" };
+}
 
 export default function SaldosPanel({ compact = false, soloSaldoProp }) {
   const [cuentas, setCuentas] = useState([]);
@@ -28,7 +41,6 @@ export default function SaldosPanel({ compact = false, soloSaldoProp }) {
   const [error, setError] = useState(null);
 
   // Estado para alternar entre ver solo el total o el detalle completo de cuentas
-  //const [soloSaldo, setSoloSaldo] = useState(false);
   const [soloSaldo, setSoloSaldo] = useState(soloSaldoProp ?? false);
 
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -140,7 +152,9 @@ export default function SaldosPanel({ compact = false, soloSaldoProp }) {
           >
             {soloSaldo ? "Detalle de cuentas" : "Ocultar"}
           </button>
-
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            Saldos
+          </p>
           <button
             onClick={() => abrirModalTransferencia()}
             className="rounded-lg text-white text-sm font-medium px-4 py-2 bg-[#009688] hover:bg-[#007f70]"
@@ -175,63 +189,71 @@ export default function SaldosPanel({ compact = false, soloSaldoProp }) {
         <>
           {compact ? (
             <div className="rounded-xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden">
-              {cuentas.map((c) => (
-                <div
-                  key={c.id}
-                  className="flex items-center justify-between px-4 py-2.5 text-sm"
-                >
-                  <span className="text-slate-600 dark:text-slate-300">
-                    {ICONO_TIPO[c.tipo] ?? ""} {c.nombre}
-                  </span>
-                  <span
-                    className={`font-medium ${Number(c.saldo_actual) < 0 ? "text-rose-600" : "text-slate-900 dark:text-white"}`}
+              {cuentas.map((c) => {
+                const { icon: Icono, color } = iconoDeCuenta(c.tipo);
+                return (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between px-4 py-2.5 text-sm"
                   >
-                    {formatMoneda(c.saldo_actual, c.moneda)}
-                  </span>
-                </div>
-              ))}
+                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                      {Icono && <Icono className={`w-4 h-4 ${color}`} />}
+                      <span>{c.nombre}</span>
+                    </div>
+                    <span
+                      className={`font-medium ${Number(c.saldo_actual) < 0 ? "text-rose-600" : "text-slate-900 dark:text-white"}`}
+                    >
+                      {formatMoneda(c.saldo_actual, c.moneda)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {cuentas.map((c) => (
-                <div
-                  key={c.id}
-                  className="
-                    bg-white dark:bg-slate-900
-                    border border-slate-200 dark:border-slate-800
-                    rounded-2xl p-4 shadow-sm
-                    flex flex-col justify-between
-                  "
-                >
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                      {ICONO_TIPO[c.tipo] ?? ""} {c.tipo}
+              {cuentas.map((c) => {
+                const { icon: Icono, color } = iconoDeCuenta(c.tipo);
+                return (
+                  <div
+                    key={c.id}
+                    className="
+                      bg-white dark:bg-slate-900
+                      border border-slate-200 dark:border-slate-800
+                      rounded-2xl p-4 shadow-sm
+                      flex flex-col justify-between
+                    "
+                  >
+                    <div>
+                      <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                        {Icono && <Icono className={`w-4 h-4 ${color}`} />}
+                        {c.tipo}
+                      </p>
+                      <p className="text-base font-semibold text-slate-900 dark:text-white mt-0.5">
+                        {c.nombre}
+                      </p>
+                    </div>
+
+                    <p
+                      className={`text-2xl font-bold mt-4 ${Number(c.saldo_actual) < 0 ? "text-rose-600" : "text-slate-900 dark:text-white"}`}
+                    >
+                      {formatMoneda(c.saldo_actual, c.moneda)}
                     </p>
-                    <p className="text-base font-semibold text-slate-900 dark:text-white mt-0.5">
-                      {c.nombre}
-                    </p>
+
+                    <button
+                      onClick={() => abrirModalTransferencia(c.id)}
+                      className="mt-3 self-start text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      Transferir desde acá
+                    </button>
                   </div>
-
-                  <p
-                    className={`text-2xl font-bold mt-4 ${Number(c.saldo_actual) < 0 ? "text-rose-600" : "text-slate-900 dark:text-white"}`}
-                  >
-                    {formatMoneda(c.saldo_actual, c.moneda)}
-                  </p>
-
-                  <button
-                    onClick={() => abrirModalTransferencia(c.id)}
-                    className="mt-3 self-start text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    Transferir desde acá
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
       )}
 
-      {/* Transferencias recientes (solo en vista completa y si no está colapsado el detalle, o puedes dejarlo visible siempre) */}
+      {/* Transferencias recientes (solo en vista completa y si no está colapsado el detalle) */}
       {!compact && !soloSaldo && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800">

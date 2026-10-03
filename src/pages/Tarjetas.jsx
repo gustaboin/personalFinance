@@ -1,205 +1,206 @@
-import { useEffect, useState } from 'react'
-import MonthSwitcher from '../components/MonthSwitcher'
-import {
-  currentMesPeriodo,
-  formatARS,
-} from '../lib/format'
+import { useEffect, useState } from "react";
+import MonthSwitcher from "../components/MonthSwitcher";
+import { currentMesPeriodo, formatARS } from "../lib/format";
 import {
   getMediosPago,
   getTotalTarjeta,
   getMovimientosTarjeta,
   getResumenActualYAnterior,
   agregarResumen,
-} from '../lib/api'
+} from "../lib/api";
 
 function formatFecha(fecha) {
-  if (!fecha) return '—'
-  const d = new Date(fecha + 'T00:00:00')
-  return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: '2-digit' })
+  if (!fecha) return "—";
+  const d = new Date(fecha + "T00:00:00");
+  return d.toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "short",
+    year: "2-digit",
+  });
 }
 
 export default function Tarjetas() {
-  const [mesPeriodo, setMesPeriodo] = useState(currentMesPeriodo())
-  const [medios, setMedios] = useState([])
-  const [medioId, setMedioId] = useState('')
+  const [mesPeriodo, setMesPeriodo] = useState(currentMesPeriodo());
+  const [medios, setMedios] = useState([]);
+  const [medioId, setMedioId] = useState("");
 
   const [total, setTotal] = useState({
     B: 0,
     G: 0,
     T: 0,
-  })
+  });
 
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Resumen (cierre / vencimiento actual y anterior)
-  const [resumenActual, setResumenActual] = useState(null)
-  const [resumenAnterior, setResumenAnterior] = useState(null)
-  const [resumenLoading, setResumenLoading] = useState(false)
+  const [resumenActual, setResumenActual] = useState(null);
+  const [resumenAnterior, setResumenAnterior] = useState(null);
+  const [resumenLoading, setResumenLoading] = useState(false);
 
   // Modal "Agregar resumen"
-  const [modalAbierto, setModalAbierto] = useState(false)
-  const [nuevoCierre, setNuevoCierre] = useState('')
-  const [nuevoVencimiento, setNuevoVencimiento] = useState('')
-  const [guardando, setGuardando] = useState(false)
-  const [errorModal, setErrorModal] = useState('')
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [nuevoCierre, setNuevoCierre] = useState("");
+  const [nuevoVencimiento, setNuevoVencimiento] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [errorModal, setErrorModal] = useState("");
 
   const imagenesMediosPago = {
-    1: '/images/efectivo.png',
-    2: '/images/mercadopago.png',
-    3: '/images/transferencia.png',
-    4: '/images/bna.png',
-    5: '/images/galiciaV.png',
-    6: '/images/bbva.png',
-    7: '/images/bbva.png',
-    8: '/images/ciudadM.png',
-    9: '/images/ciudadV.png',
-    11: '/images/transferencia.png',
-  }
+    1: "/images/efectivo.png",
+    2: "/images/mercadopago.png",
+    3: "/images/transferencia.png",
+    4: "/images/bna.png",
+    5: "/images/galiciaV.png",
+    6: "/images/bbva.png",
+    7: "/images/bbva.png",
+    8: "/images/ciudadM.png",
+    9: "/images/ciudadV.png",
+    12: "/images/mercadopago.png",
+  };
 
   const coloresMediosPago = {
-    1: '#5cb85c',
-    2: '#2abcff',
-    3: '#ffffff',
-    4: '#005f86',
-    5: ['#fa6400', '#bf2e3b'],
-    6: '#103667',
-    7: ['#005aa3', '#103667'],
-    8: ['#26abec', '#0c53a5'],
-    9: '#26abec',
-    11: '#ffffff',
-  }
+    1: "#5cb85c",
+    2: "#2abcff",
+    3: "#ffffff",
+    4: "#005f86",
+    5: ["#fa6400", "#bf2e3b"],
+    6: "#103667",
+    7: ["#005aa3", "#103667"],
+    8: ["#26abec", "#0c53a5"],
+    9: "#26abec",
+    12: "#2abcff",
+  };
 
   useEffect(() => {
-    getMediosPago().then((data) => {
-      if (!data) return
+    getMediosPago()
+      .then((data) => {
+        if (!data) return;
 
-      const tarjetasFiltradas = data.filter((m) => Number(m.tipo_id) === 4)
+        const tarjetasFiltradas = data.filter((m) => Number(m.tipo_id) === 4);
 
-      setMedios(tarjetasFiltradas)
+        setMedios(tarjetasFiltradas);
 
-      if (tarjetasFiltradas.length > 0) {
-        setMedioId(String(tarjetasFiltradas[0].id))
-      }
-    }).catch(() => {
-      // noop
-    })
-  }, [])
+        if (tarjetasFiltradas.length > 0) {
+          setMedioId(String(tarjetasFiltradas[0].id));
+        }
+      })
+      .catch(() => {
+        // noop
+      });
+  }, []);
 
   useEffect(() => {
-    if (!medioId) return
+    if (!medioId) return;
 
-    let cancelled = false
+    let cancelled = false;
 
-    setLoading(true)
+    setLoading(true);
 
     Promise.all([
       getTotalTarjeta(mesPeriodo, Number(medioId)),
       getMovimientosTarjeta(mesPeriodo, Number(medioId)),
     ]).then(([totalData, itemsData]) => {
-      if (cancelled) return
+      if (cancelled) return;
 
-      setTotal(totalData)
+      setTotal(totalData);
 
       setItems(
-        [...itemsData].sort(
-          (a, b) => new Date(a.fecha) - new Date(b.fecha)
-        )
-      )
+        [...itemsData].sort((a, b) => new Date(a.fecha) - new Date(b.fecha)),
+      );
 
-      setLoading(false)
-    })
+      setLoading(false);
+    });
 
     return () => {
-      cancelled = true
-    }
-  }, [mesPeriodo, medioId])
+      cancelled = true;
+    };
+  }, [mesPeriodo, medioId]);
 
   // Trae el resumen activo + el anterior para la tarjeta seleccionada
   function cargarResumenes() {
-     if (!medioId || medioId === '0') {
-    setResumenActual(null)
-    setResumenAnterior(null)
-    return
-  }
+    if (!medioId || medioId === "0") {
+      setResumenActual(null);
+      setResumenAnterior(null);
+      return;
+    }
 
-  console.log('Cargando resumenes para medioId:', medioId, 'mesPeriodo:', mesPeriodo)
+    console.log(
+      "Cargando resumenes para medioId:",
+      medioId,
+      "mesPeriodo:",
+      mesPeriodo,
+    );
 
-    setResumenLoading(true)
-    
-  
-  // Transformamo el periodo de navegación (ej: "202609") a formato fecha (ej: "2026-09-01")
-  const año = mesPeriodo.slice(0, 4)
-  const mes = mesPeriodo.slice(4)
-  const periodoFormateado = `${año}-${mes}-01`
-  console.log('periodoFormateado:', periodoFormateado)
-  getResumenActualYAnterior(Number(medioId), periodoFormateado)
-    .then(({ actual, anterior }) => {
-      // Al navegar, actual tendrá el resumen del mes seleccionado y anterior será null
-      setResumenActual(actual)
-      setResumenAnterior(anterior) 
-      console.log('Resumen actual:', actual, 'Resumen anterior:', anterior)
-    })
-    .catch((err) => {
-      console.error('Error buscando cierre/vencimiento:', err)
-      setResumenActual(null)
-      setResumenAnterior(null)
-    })
-    .finally(() => setResumenLoading(false))
+    setResumenLoading(true);
+
+    // Transformamo el periodo de navegación (ej: "202609") a formato fecha (ej: "2026-09-01")
+    const año = mesPeriodo.slice(0, 4);
+    const mes = mesPeriodo.slice(4);
+    const periodoFormateado = `${año}-${mes}-01`;
+    console.log("periodoFormateado:", periodoFormateado);
+    getResumenActualYAnterior(Number(medioId), periodoFormateado)
+      .then(({ actual, anterior }) => {
+        // Al navegar, actual tendrá el resumen del mes seleccionado y anterior será null
+        setResumenActual(actual);
+        setResumenAnterior(anterior);
+        console.log("Resumen actual:", actual, "Resumen anterior:", anterior);
+      })
+      .catch((err) => {
+        console.error("Error buscando cierre/vencimiento:", err);
+        setResumenActual(null);
+        setResumenAnterior(null);
+      })
+      .finally(() => setResumenLoading(false));
   }
 
   useEffect(() => {
-    cargarResumenes()
-  }, [medioId, mesPeriodo])
+    cargarResumenes();
+  }, [medioId, mesPeriodo]);
 
   function abrirModal() {
-    setErrorModal('')
-    setNuevoCierre('')
-    setNuevoVencimiento('')
-    setModalAbierto(true)
+    setErrorModal("");
+    setNuevoCierre("");
+    setNuevoVencimiento("");
+    setModalAbierto(true);
   }
 
   function cerrarModal() {
-    if (guardando) return
-    setModalAbierto(false)
+    if (guardando) return;
+    setModalAbierto(false);
   }
 
   async function handleGuardarResumen(e) {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!nuevoCierre || !nuevoVencimiento) {
-      setErrorModal('Completá fecha de cierre y de vencimiento.')
-      return
+      setErrorModal("Completá fecha de cierre y de vencimiento.");
+      return;
     }
 
-    setGuardando(true)
-    setErrorModal('')
+    setGuardando(true);
+    setErrorModal("");
 
     try {
-      await agregarResumen(Number(medioId), nuevoCierre, nuevoVencimiento)
-      setModalAbierto(false)
-      cargarResumenes()
+      await agregarResumen(Number(medioId), nuevoCierre, nuevoVencimiento);
+      setModalAbierto(false);
+      cargarResumenes();
     } catch (err) {
-      console.error('Error al agregar resumen:', err)
-      setErrorModal('No se pudo guardar el resumen. Revisá los datos.')
+      console.error("Error al agregar resumen:", err);
+      setErrorModal("No se pudo guardar el resumen. Revisá los datos.");
     } finally {
-      setGuardando(false)
+      setGuardando(false);
     }
   }
 
   return (
     <div className="space-y-6">
-
       {/* Título + mes */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
           Resumen Tarjetas
         </h2>
 
-        <MonthSwitcher
-          mesPeriodo={mesPeriodo}
-          onChange={setMesPeriodo}
-        />
+        <MonthSwitcher mesPeriodo={mesPeriodo} onChange={setMesPeriodo} />
       </div>
 
       {/* Descripción */}
@@ -210,8 +211,8 @@ export default function Tarjetas() {
       {/* Medios de pago */}
       <div className="flex flex-wrap gap-2">
         {medios.map((m) => {
-          const activo = medioId === String(m.id)
-          const color = coloresMediosPago[Number(m.id)]
+          const activo = medioId === String(m.id);
+          const color = coloresMediosPago[Number(m.id)];
 
           return (
             <button
@@ -228,7 +229,7 @@ export default function Tarjetas() {
 
                 ${
                   activo
-                    ? 'text-white'
+                    ? "text-white"
                     : `
                       bg-white
                       hover:bg-slate-50
@@ -258,7 +259,7 @@ export default function Tarjetas() {
             >
               {m.nombre}
             </button>
-          )
+          );
         })}
       </div>
 
@@ -277,7 +278,6 @@ export default function Tarjetas() {
         "
       >
         <div className="flex flex-wrap gap-3">
-
           {/* Entidad */}
           <div
             className="
@@ -298,7 +298,6 @@ export default function Tarjetas() {
             "
           >
             <div className="flex items-center gap-4 h-full">
-
               {/* Imagen */}
               <div
                 className="
@@ -346,12 +345,11 @@ export default function Tarjetas() {
                     dark:text-white
                   "
                 >
-                  {medios.find(
-                    (m) => String(m.id) === String(medioId)
-                  )?.nombre.replace(/transferencia/gi, '< > ')}
+                  {medios
+                    .find((m) => String(m.id) === String(medioId))
+                    ?.nombre.replace(/transferencia/gi, "< > ")}
                 </p>
               </div>
-
             </div>
           </div>
 
@@ -368,17 +366,15 @@ export default function Tarjetas() {
               shadow-sm
             "
             style={{
-              backgroundColor: '#f0AD4E',
-              borderColor: '#f0AD4E',
+              backgroundColor: "#f0AD4E",
+              borderColor: "#f0AD4E",
             }}
           >
             <p className="text-xs font-medium uppercase tracking-wide">
               Total Gastos
             </p>
 
-            <p className="text-2xl font-semibold mt-1">
-              {formatARS(total.G)}
-            </p>
+            <p className="text-2xl font-semibold mt-1">{formatARS(total.G)}</p>
           </div>
 
           {/* Total Bonificación */}
@@ -394,17 +390,15 @@ export default function Tarjetas() {
               shadow-sm
             "
             style={{
-              backgroundColor: '#5cb85c',
-              borderColor: '#5cb85c',
+              backgroundColor: "#5cb85c",
+              borderColor: "#5cb85c",
             }}
           >
             <p className="text-xs font-medium uppercase tracking-wide">
               Total Bonificación
             </p>
 
-            <p className="text-2xl font-semibold mt-1">
-              {formatARS(total.B)}
-            </p>
+            <p className="text-2xl font-semibold mt-1">{formatARS(total.B)}</p>
           </div>
 
           {/* Total General */}
@@ -420,17 +414,15 @@ export default function Tarjetas() {
               shadow-sm
             "
             style={{
-              backgroundColor: '#337ab7',
-              borderColor: '#337ab7',
+              backgroundColor: "#337ab7",
+              borderColor: "#337ab7",
             }}
           >
             <p className="text-xs font-medium uppercase tracking-wide">
               Total General
             </p>
 
-            <p className="text-2xl font-semibold mt-1">
-              {formatARS(total.T)}
-            </p>
+            <p className="text-2xl font-semibold mt-1">{formatARS(total.T)}</p>
           </div>
 
           {/* Cierre / Vencimiento */}
@@ -481,7 +473,7 @@ export default function Tarjetas() {
                   leading-none
                   disabled:opacity-40
                 "
-                style={{ backgroundColor: '#337ab7' }}
+                style={{ backgroundColor: "#337ab7" }}
               >
                 +
               </button>
@@ -523,7 +515,6 @@ export default function Tarjetas() {
               </div>
             )}
           </div>
-
         </div>
       </div>
 
@@ -543,7 +534,6 @@ export default function Tarjetas() {
       >
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-
             {/* Encabezado */}
             <thead
               className="
@@ -557,17 +547,11 @@ export default function Tarjetas() {
               "
             >
               <tr>
-                <th className="text-left px-4 py-2">
-                  Fecha
-                </th>
+                <th className="text-left px-4 py-2">Fecha</th>
 
-                <th className="text-left px-4 py-2">
-                  Concepto
-                </th>
+                <th className="text-left px-4 py-2">Concepto</th>
 
-                <th className="text-right px-4 py-2">
-                  Importe
-                </th>
+                <th className="text-right px-4 py-2">Importe</th>
               </tr>
             </thead>
 
@@ -603,9 +587,9 @@ export default function Tarjetas() {
                 </tr>
               ) : (
                 items.map((it, i) => {
-                  const importe = Number(it.importe)
-                  const esNegativo = importe < 0
-                  const esAlto = importe > 499999
+                  const importe = Number(it.importe);
+                  const esNegativo = importe < 0;
+                  const esAlto = importe > 499999;
 
                   return (
                     <tr
@@ -645,15 +629,13 @@ export default function Tarjetas() {
                         {it.fecha}
                       </td>
 
-                      <td className="px-4 py-2">
-                        {it.concepto}
-                      </td>
+                      <td className="px-4 py-2">{it.concepto}</td>
 
                       <td className="px-4 py-2 text-right font-medium">
                         {formatARS(it.importe)}
                       </td>
                     </tr>
-                  )
+                  );
                 })
               )}
             </tbody>
@@ -673,20 +655,14 @@ export default function Tarjetas() {
                     dark:text-white
                   "
                 >
-                  <td
-                    className="px-4 py-2"
-                    colSpan={2}
-                  >
+                  <td className="px-4 py-2" colSpan={2}>
                     Total
                   </td>
 
-                  <td className="px-4 py-2 text-right">
-                    {formatARS(total.T)}
-                  </td>
+                  <td className="px-4 py-2 text-right">{formatARS(total.T)}</td>
                 </tr>
               </tfoot>
             )}
-
           </table>
         </div>
       </div>
@@ -779,16 +755,15 @@ export default function Tarjetas() {
                     px-3 py-1.5 rounded-lg text-sm font-medium text-white
                     disabled:opacity-50
                   "
-                  style={{ backgroundColor: '#337ab7' }}
+                  style={{ backgroundColor: "#337ab7" }}
                 >
-                  {guardando ? 'Guardando...' : 'Guardar'}
+                  {guardando ? "Guardando..." : "Guardar"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
     </div>
-  )
+  );
 }
