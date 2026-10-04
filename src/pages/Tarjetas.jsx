@@ -186,6 +186,7 @@ export default function Tarjetas() {
       cargarResumenes();
     } catch (err) {
       console.error("Error al agregar resumen:", err);
+      //setErrorModal(err.message + (err.details ? " | " + err.details : ""));
       setErrorModal("No se pudo guardar el resumen. Revisá los datos.");
     } finally {
       setGuardando(false);

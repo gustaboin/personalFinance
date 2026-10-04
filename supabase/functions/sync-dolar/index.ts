@@ -1,80 +1,88 @@
 // supabase/functions/sync-dolar/index.ts
 //
-// Trae la cotización USD del BCRA de los últimos días (para auto-completar
-// huecos si el cron falló algún día) y hace upsert en la tabla `monedas`.
-//
-// Deploy: supabase functions deploy sync-dolar
-// Test manual: curl -X POST https://<proyecto>.supabase.co/functions/v1/sync-dolar \
-//                -H "Authorization: Bearer <ANON_O_SERVICE_KEY>"
+// Trae USD oficial Y contado con liqui (CCL) de api.argentinadatos.com,
+// para los últimos días, y hace upsert en `monedas`.
+// Reusa la misma tabla: moneda='USD' (oficial), moneda='USD_CCL' (CCL).
+// No agrega columnas nuevas, solo un valor nuevo en la columna moneda.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const DIAS_HACIA_ATRAS = 5 // cubre fines de semana + algún feriado sin generar huecos
+const DIAS_HACIA_ATRAS = 5
 
-function formatearFecha(d: Date) {
-  return d.toISOString().slice(0, 10) // YYYY-MM-DD
+// casa de argentinadatos -> cómo lo guardamos en monedas.moneda
+const CASAS = [
+  { casa: 'oficial', moneda: 'USD' },
+  { casa: 'contadoconliqui', moneda: 'USD_CCL' },
+]
+
+function formatearFechaApi(d: Date) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}/${m}/${day}`
 }
 
 Deno.serve(async () => {
-  try {
-    const hoy = new Date()
-    const desde = new Date(hoy)
-    desde.setDate(desde.getDate() - DIAS_HACIA_ATRAS)
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
 
-    const fechaDesde = formatearFecha(desde)
-    const fechaHasta = formatearFecha(hoy)
+  const filasParaGuardar: any[] = []
+  const resultados: { casa: string; fecha: string; ok: boolean; motivo?: string }[] = []
 
-    // La API del BCRA exige limit entre 10 y 1000 — nunca pasar un valor menor a 10
-    const url = `https://api.bcra.gob.ar/estadisticascambiarias/v1.0/Cotizaciones/USD?fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}&limit=10`
+  for (const { casa, moneda } of CASAS) {
+    for (let i = 0; i <= DIAS_HACIA_ATRAS; i++) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const fechaApi = formatearFechaApi(d)
 
-    const res = await fetch(url)
+      try {
+        const res = await fetch(`https://api.argentinadatos.com/v1/cotizaciones/dolares/${casa}/${fechaApi}`)
+        const texto = await res.text()
 
-    if (!res.ok) {
-      return new Response(
-        JSON.stringify({ error: `BCRA respondió ${res.status}` }),
-        { status: 502 }
-      )
-    }
-
-    const data = await res.json()
-    const resultados = data?.results ?? []
-
-    if (resultados.length === 0) {
-      return new Response(JSON.stringify({ mensaje: 'Sin datos del BCRA en el rango', fechaDesde, fechaHasta }), { status: 200 })
-    }
-
-    // Cada "result" trae fecha + detalle[]. El detalle[0] tiene tipoCotizacion.
-    const filas = resultados
-      .map((r: any) => {
-        const cot = r.detalle?.[0]?.tipoCotizacion
-        if (cot == null) return null
-        return {
-          fecha: r.fecha,
-          moneda: 'USD',
-          valorcompra: cot,
-          valorventa: cot,
+        if (!res.ok || !texto) {
+          resultados.push({ casa, fecha: fechaApi, ok: false, motivo: `status ${res.status}` })
+          continue
         }
-      })
-      .filter(Boolean)
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+        const data = JSON.parse(texto)
 
-    const { error, count } = await supabase
-      .from('monedas')
-      .upsert(filas, { onConflict: 'fecha,moneda', count: 'exact' })
+        if (data?.compra == null || data?.venta == null || !data?.fecha) {
+          resultados.push({ casa, fecha: fechaApi, ok: false, motivo: 'respuesta incompleta' })
+          continue
+        }
 
-    if (error) {
-      return new Response(JSON.stringify({ error: error.message }), { status: 500 })
+        filasParaGuardar.push({
+          fecha: data.fecha,
+          moneda,
+          valorcompra: data.compra,
+          valorventa: data.venta,
+        })
+        resultados.push({ casa, fecha: fechaApi, ok: true })
+      } catch (err) {
+        resultados.push({ casa, fecha: fechaApi, ok: false, motivo: String(err) })
+      }
     }
+  }
 
+  if (filasParaGuardar.length === 0) {
     return new Response(
-      JSON.stringify({ ok: true, filasGuardadas: filas.length, fechaDesde, fechaHasta }),
+      JSON.stringify({ ok: true, mensaje: 'Sin cotizaciones nuevas', detalle: resultados }),
       { status: 200 }
     )
-  } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500 })
   }
+
+  const { error } = await supabase
+    .from('monedas')
+    .upsert(filasParaGuardar, { onConflict: 'fecha,moneda' })
+
+  if (error) {
+    return new Response(JSON.stringify({ error: error.message, detalle: resultados }), { status: 500 })
+  }
+
+  return new Response(
+    JSON.stringify({ ok: true, filasGuardadas: filasParaGuardar.length, detalle: resultados }),
+    { status: 200 }
+  )
 })
