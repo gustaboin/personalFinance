@@ -3,7 +3,7 @@ import {
   getCuentas,
   addTransferencia,
   getTransferenciasRecientes,
-} from "../lib/Cuentasapi";
+} from "../lib/CuentasApi";
 
 function formatMoneda(valor, moneda) {
   return new Intl.NumberFormat(moneda === "USD" ? "en-US" : "es-AR", {

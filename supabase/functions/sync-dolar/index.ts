@@ -1,89 +1,80 @@
 // supabase/functions/sync-dolar/index.ts
 //
-// Trae la cotización USD oficial (compra/venta reales) de api.argentinadatos.com
-// para los últimos días, y hace upsert en la tabla `monedas`.
-// Como la API es por fecha puntual (no por rango), se pide una por una —
-// así, si el cron falló algún día, el día siguiente se auto-completa el hueco.
+// Trae la cotización USD del BCRA de los últimos días (para auto-completar
+// huecos si el cron falló algún día) y hace upsert en la tabla `monedas`.
 //
 // Deploy: supabase functions deploy sync-dolar
-// Test manual:
-// curl -i -X POST https://<proyecto>.supabase.co/functions/v1/sync-dolar \
-//   -H "Authorization: Bearer <SERVICE_ROLE_KEY>" \
-//   -H "apikey: <SERVICE_ROLE_KEY>" \
-//   -H "Content-Type: application/json" -d "{}"
+// Test manual: curl -X POST https://<proyecto>.supabase.co/functions/v1/sync-dolar \
+//                -H "Authorization: Bearer <ANON_O_SERVICE_KEY>"
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const DIAS_HACIA_ATRAS = 5 // cubre fines de semana + algún feriado sin generar huecos
 
-function formatearFechaApi(d: Date) {
-  // La API espera YYYY/MM/DD
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}/${m}/${day}`
+function formatearFecha(d: Date) {
+  return d.toISOString().slice(0, 10) // YYYY-MM-DD
 }
 
 Deno.serve(async () => {
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  )
+  try {
+    const hoy = new Date()
+    const desde = new Date(hoy)
+    desde.setDate(desde.getDate() - DIAS_HACIA_ATRAS)
 
-  const resultados: { fecha: string; ok: boolean; motivo?: string }[] = []
-  const filasParaGuardar: any[] = []
+    const fechaDesde = formatearFecha(desde)
+    const fechaHasta = formatearFecha(hoy)
 
-  for (let i = 0; i <= DIAS_HACIA_ATRAS; i++) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const fechaApi = formatearFechaApi(d)
+    // La API del BCRA exige limit entre 10 y 1000 — nunca pasar un valor menor a 10
+    const url = `https://api.bcra.gob.ar/estadisticascambiarias/v1.0/Cotizaciones/USD?fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}&limit=10`
 
-    try {
-      const res = await fetch(`https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial/${fechaApi}`)
-      const texto = await res.text()
+    const res = await fetch(url)
 
-      if (!res.ok || !texto) {
-        // Normal para fines de semana / feriados: esa fecha no tiene cotización. No es un error.
-        resultados.push({ fecha: fechaApi, ok: false, motivo: `status ${res.status}` })
-        continue
-      }
-
-      const data = JSON.parse(texto)
-
-      if (data?.compra == null || data?.venta == null || !data?.fecha) {
-        resultados.push({ fecha: fechaApi, ok: false, motivo: 'respuesta incompleta' })
-        continue
-      }
-
-      filasParaGuardar.push({
-        fecha: data.fecha, // ya viene como YYYY-MM-DD
-        moneda: 'USD',
-        valorcompra: data.compra,
-        valorventa: data.venta,
-      })
-      resultados.push({ fecha: fechaApi, ok: true })
-    } catch (err) {
-      resultados.push({ fecha: fechaApi, ok: false, motivo: String(err) })
+    if (!res.ok) {
+      return new Response(
+        JSON.stringify({ error: `BCRA respondió ${res.status}` }),
+        { status: 502 }
+      )
     }
-  }
 
-  if (filasParaGuardar.length === 0) {
+    const data = await res.json()
+    const resultados = data?.results ?? []
+
+    if (resultados.length === 0) {
+      return new Response(JSON.stringify({ mensaje: 'Sin datos del BCRA en el rango', fechaDesde, fechaHasta }), { status: 200 })
+    }
+
+    // Cada "result" trae fecha + detalle[]. El detalle[0] tiene tipoCotizacion.
+    const filas = resultados
+      .map((r: any) => {
+        const cot = r.detalle?.[0]?.tipoCotizacion
+        if (cot == null) return null
+        return {
+          fecha: r.fecha,
+          moneda: 'USD',
+          valorcompra: cot,
+          valorventa: cot,
+        }
+      })
+      .filter(Boolean)
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    const { error, count } = await supabase
+      .from('monedas')
+      .upsert(filas, { onConflict: 'fecha,moneda', count: 'exact' })
+
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), { status: 500 })
+    }
+
     return new Response(
-      JSON.stringify({ ok: true, mensaje: 'Sin cotizaciones nuevas para guardar', detalle: resultados }),
+      JSON.stringify({ ok: true, filasGuardadas: filas.length, fechaDesde, fechaHasta }),
       { status: 200 }
     )
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500 })
   }
-
-  const { error } = await supabase
-    .from('monedas')
-    .upsert(filasParaGuardar, { onConflict: 'fecha,moneda' })
-
-  if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 })
-  }
-
-  return new Response(
-    JSON.stringify({ ok: true, filasGuardadas: filasParaGuardar.length, detalle: resultados }),
-    { status: 200 }
-  )
 })

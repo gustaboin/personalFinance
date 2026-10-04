@@ -3,13 +3,15 @@ import {
   getCuentas,
   addTransferencia,
   getTransferenciasRecientes,
-} from "../lib/cuentasApi";
+} from "../lib/CuentasApi";
 import {
   Landmark,
   Smartphone,
   DollarSign,
   Bus,
   TrendingUp,
+  BanknoteArrowDown,
+  PiggyBank,
 } from "lucide-react";
 
 function formatMoneda(valor, moneda) {
@@ -25,7 +27,12 @@ const ICONO_TIPO = {
   billetera: { icon: Smartphone, color: "text-green-600 dark:text-green-400" },
   efectivo: { icon: DollarSign, color: "text-yellow-600 dark:text-yellow-400" },
   prepaga: { icon: Bus, color: "text-purple-600 dark:text-purple-400" },
-  broker: { icon: TrendingUp, color: "text-red-600 dark:text-red-400" },
+  broker: { icon: PiggyBank, color: "text-red-600 dark:text-red-400" },
+};
+
+const ICONO_TRANSFERENCIA = {
+  icon: BanknoteArrowDown,
+  color: "text-slate-900",
 };
 
 // Devuelve el componente de ícono + color para un tipo de cuenta, con fallback
@@ -144,43 +151,61 @@ export default function SaldosPanel({ compact = false, soloSaldoProp }) {
   return (
     <div className="space-y-5">
       {!compact && (
-        <div className="flex justify-between items-center">
-          {/* Botón para alternar vista de solo saldo vs detalle */}
-          <button
-            onClick={() => setSoloSaldo(!soloSaldo)}
-            className="px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-lg transition"
-          >
-            {soloSaldo ? "Detalle de cuentas" : "Ocultar"}
-          </button>
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-            Saldos
-          </p>
-          <button
-            onClick={() => abrirModalTransferencia()}
-            className="rounded-lg text-white text-sm font-medium px-4 py-2 bg-[#009688] hover:bg-[#007f70]"
-          >
-            + Nueva transferencia
-          </button>
-        </div>
-      )}
-
-      {/* Totales por moneda (Siempre visibles o adaptados) */}
-      {Object.keys(totalesPorMoneda).length > 0 && (
-        <div className="flex flex-wrap gap-3">
-          {Object.entries(totalesPorMoneda).map(([moneda, total]) => (
-            <div
-              key={moneda}
-              className="rounded-xl px-4 py-3 text-white shadow-sm flex-1 min-w-[160px]"
-              style={{ backgroundColor: "#337ab7" }}
-            >
-              <p className="text-xs font-medium uppercase tracking-wide">
-                Total en {moneda}
-              </p>
-              <p className="text-xl font-semibold mt-1">
-                {formatMoneda(total, moneda)}
+        <div className="flex flex-col gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+          {/* Fila Superior: Título/Sección a la izquierda, balances a la derecha */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                Balances Generales
+              </h2>
+              <p className="text-xs text-slate-400">
+                Estado actual de tus activos disponibles
               </p>
             </div>
-          ))}
+
+            {/* Totales integrados de forma prolija en la interfaz */}
+            {Object.keys(totalesPorMoneda).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(totalesPorMoneda).map(([moneda, total]) => (
+                  <div
+                    key={moneda}
+                    className="bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 rounded-xl px-4 py-2 shadow-sm"
+                  >
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                      Total en {moneda}
+                    </p>
+                    <p className="text-base font-bold text-slate-900 dark:text-white">
+                      {formatMoneda(total, moneda)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Fila Inferior: Acciones y controles de la vista */}
+          <div className="flex items-center justify-between pt-1">
+            {/* Botón Ocultar / Mostrar detalle */}
+            <button
+              onClick={() => setSoloSaldo(!soloSaldo)}
+              className="px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-lg transition"
+            >
+              {soloSaldo ? "Mostrar detalle" : "Ocultar cuentas"}
+            </button>
+
+            {/* Botón Global de Transferencia */}
+            <button
+              onClick={() => abrirModalTransferencia()}
+              className="rounded-lg text-white text-xs font-semibold px-4 py-2 bg-[#009688] hover:bg-[#007f70] transition-colors shadow-sm flex items-center gap-1.5"
+            >
+              {ICONO_TRANSFERENCIA.icon && (
+                <ICONO_TRANSFERENCIA.icon
+                  className={`w-4 h-4 ${ICONO_TRANSFERENCIA.color}`}
+                />
+              )}
+              <span> TRANSFERIR</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -219,7 +244,7 @@ export default function SaldosPanel({ compact = false, soloSaldoProp }) {
                     className="
                       bg-white dark:bg-slate-900
                       border border-slate-200 dark:border-slate-800
-                      rounded-2xl p-4 shadow-sm
+                      rounded-xl p-2 shadow-sm
                       flex flex-col justify-between
                     "
                   >
@@ -234,14 +259,14 @@ export default function SaldosPanel({ compact = false, soloSaldoProp }) {
                     </div>
 
                     <p
-                      className={`text-2xl font-bold mt-4 ${Number(c.saldo_actual) < 0 ? "text-rose-600" : "text-slate-900 dark:text-white"}`}
+                      className={`text-xl font-bold mt-2 ${Number(c.saldo_actual) < 0 ? "text-rose-600" : "text-slate-900 dark:text-white"}`}
                     >
                       {formatMoneda(c.saldo_actual, c.moneda)}
                     </p>
 
                     <button
                       onClick={() => abrirModalTransferencia(c.id)}
-                      className="mt-3 self-start text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                      className="mt-2 self-start text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       Transferir desde acá
                     </button>
