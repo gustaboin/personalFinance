@@ -19,7 +19,7 @@ export async function getCategorias() {
 export async function getMediosPago() {
   const { data, error } = await supabase
     .from("medios_pago")
-    .select("id, nombre, tipo_id")
+    .select("id, nombre, tipo_id, activo")
     .order("nombre");
   if (error) throw error;
   return data;

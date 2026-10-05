@@ -93,6 +93,7 @@ export const CATALOGOS = [
         type: "select",
         fkTable: "marcas_tarjeta",
       },
+      { key: "activo", label: "Activo", type: "checkbox" },
     ],
   },
 ];

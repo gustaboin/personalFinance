@@ -78,6 +78,8 @@ export default function Tarjetas() {
 
         const tarjetasFiltradas = data.filter((m) => Number(m.tipo_id) === 4);
 
+        tarjetasFiltradas.sort((a, b) => b.nombre.localeCompare(a.nombre));
+
         setMedios(tarjetasFiltradas);
 
         if (tarjetasFiltradas.length > 0) {

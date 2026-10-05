@@ -1,137 +1,156 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react";
 import {
   CATALOGOS,
   getCatalogo,
   addCatalogoItem,
   updateCatalogoItem,
   deleteCatalogoItem,
-} from '../lib/catalogApi'
-import ComboboxSelect from '../components/ComboboxSelect'
+} from "../lib/catalogApi";
+import ComboboxSelect from "../components/ComboboxSelect";
 
 function formVacioDe(catalogo) {
-  const f = {}
-  catalogo.campos.forEach((c) => { f[c.key] = '' })
-  return f
+  const f = {};
+  catalogo.campos.forEach((c) => {
+    f[c.key] = c.type === "checkbox" ? true : "";
+  });
+  return f;
 }
 
 export default function Config() {
-  const [catalogoActivo, setCatalogoActivo] = useState(CATALOGOS[0].tabla)
-  const catalogo = CATALOGOS.find((c) => c.tabla === catalogoActivo)
+  const [catalogoActivo, setCatalogoActivo] = useState(CATALOGOS[0].tabla);
+  const catalogo = CATALOGOS.find((c) => c.tabla === catalogoActivo);
 
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // opciones de tablas referenciadas (FK), para los selects del form y la tabla
-  const [opcionesFK, setOpcionesFK] = useState({})
+  const [opcionesFK, setOpcionesFK] = useState({});
 
-  const [form, setForm] = useState(formVacioDe(catalogo))
-  const [editandoId, setEditandoId] = useState(null)
-  const [guardando, setGuardando] = useState(false)
+  const [form, setForm] = useState(formVacioDe(catalogo));
+  const [editandoId, setEditandoId] = useState(null);
+  const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
-    setForm(formVacioDe(catalogo))
-    setEditandoId(null)
-    setError(null)
-    cargar()
-    cargarOpcionesFK()
+    setForm(formVacioDe(catalogo));
+    setEditandoId(null);
+    setError(null);
+    cargar();
+    cargarOpcionesFK();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalogoActivo])
+  }, [catalogoActivo]);
 
   function cargar() {
-    setLoading(true)
+    setLoading(true);
     getCatalogo(catalogo.tabla)
       .then(setItems)
       .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
+      .finally(() => setLoading(false));
   }
 
   function cargarOpcionesFK() {
-    const fkFields = catalogo.campos.filter((c) => c.type === 'select')
+    const fkFields = catalogo.campos.filter((c) => c.type === "select");
     if (fkFields.length === 0) {
-      setOpcionesFK({})
-      return
+      setOpcionesFK({});
+      return;
     }
     Promise.all(fkFields.map((c) => getCatalogo(c.fkTable)))
       .then((resultados) => {
-        const mapa = {}
-        fkFields.forEach((c, i) => { mapa[c.fkTable] = resultados[i] })
-        setOpcionesFK(mapa)
+        const mapa = {};
+        fkFields.forEach((c, i) => {
+          mapa[c.fkTable] = resultados[i];
+        });
+        setOpcionesFK(mapa);
       })
-      .catch((err) => setError(err.message))
+      .catch((err) => setError(err.message));
   }
 
   function empezarEdicion(item) {
-    const f = {}
-    catalogo.campos.forEach((c) => { f[c.key] = String(item[c.key] ?? '') })
-    setForm(f)
-    setEditandoId(item.id)
+    const f = {};
+    catalogo.campos.forEach((c) => {
+      if (c.type === "checkbox") {
+        // Mantiene el booleano real (true o false) sin convertirlo a texto
+        f[c.key] = item[c.key] ?? true;
+      } else {
+        f[c.key] = String(item[c.key] ?? "");
+      }
+    });
+    setForm(f);
+    setEditandoId(item.id);
   }
 
   function cancelarEdicion() {
-    setForm(formVacioDe(catalogo))
-    setEditandoId(null)
-    setError(null)
+    setForm(formVacioDe(catalogo));
+    setEditandoId(null);
+    setError(null);
   }
 
   async function handleSubmit(e) {
-    e.preventDefault()
-    setError(null)
+    e.preventDefault();
+    setError(null);
 
     if (!form.nombre?.trim()) {
-      setError('El nombre es obligatorio.')
-      return
+      setError("El nombre es obligatorio.");
+      return;
     }
 
-    const payload = {}
+    const payload = {};
     catalogo.campos.forEach((c) => {
-      payload[c.key] = c.type === 'select'
-        ? (form[c.key] ? Number(form[c.key]) : null)
-        : form[c.key]
-    })
+      if (c.type === "select") {
+        payload[c.key] = form[c.key] ? Number(form[c.key]) : null;
+      } else if (c.type === "checkbox") {
+        payload[c.key] = Boolean(form[c.key]); // para guardar false si no está chequeado
+      } else {
+        payload[c.key] = form[c.key];
+      }
+    });
 
-    setGuardando(true)
+    setGuardando(true);
     try {
       if (editandoId) {
-        await updateCatalogoItem(catalogo.tabla, editandoId, payload)
+        await updateCatalogoItem(catalogo.tabla, editandoId, payload);
       } else {
-        await addCatalogoItem(catalogo.tabla, payload)
+        await addCatalogoItem(catalogo.tabla, payload);
       }
-      cancelarEdicion()
-      cargar()
+      cancelarEdicion();
+      cargar();
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setGuardando(false)
+      setGuardando(false);
     }
   }
 
   async function handleDelete(id) {
-    if (!confirm('¿Eliminar este registro?')) return
+    if (!confirm("¿Eliminar este registro?")) return;
     try {
-      await deleteCatalogoItem(catalogo.tabla, id)
-      cargar()
+      await deleteCatalogoItem(catalogo.tabla, id);
+      cargar();
     } catch (err) {
-      alert('No se pudo eliminar: probablemente está en uso en otra tabla (movimientos, cuotas, etc.).')
+      alert(
+        "No se pudo eliminar: probablemente está en uso en otra tabla (movimientos, cuotas, etc.).",
+      );
     }
   }
 
   function nombreFK(fkTable, id) {
-    const opt = (opcionesFK[fkTable] || []).find((o) => String(o.id) === String(id))
-    return opt?.nombre ?? '—'
+    const opt = (opcionesFK[fkTable] || []).find(
+      (o) => String(o.id) === String(id),
+    );
+    return opt?.nombre ?? "—";
   }
 
-  const camposFK = catalogo.campos.filter((c) => c.type === 'select')
+  const camposFK = catalogo.campos.filter((c) => c.type === "select");
 
   return (
     <div className="space-y-6">
-
       <div>
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
           Configuración
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Administrá proveedores, medios de pago, entidades y demás catálogos sin tocar la base a mano.
+          Administrá proveedores, medios de pago, entidades y demás catálogos
+          sin tocar la base a mano.
         </p>
       </div>
 
@@ -145,8 +164,8 @@ export default function Config() {
               px-3 py-1.5 rounded-lg text-sm font-medium border transition
               ${
                 catalogoActivo === c.tabla
-                  ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-800'
+                  ? "bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-800"
               }
             `}
           >
@@ -165,7 +184,9 @@ export default function Config() {
       >
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-            {editandoId ? `Editando #${editandoId}` : `Nuevo en ${catalogo.label}`}
+            {editandoId
+              ? `Editando #${editandoId}`
+              : `Nuevo en ${catalogo.label}`}
           </p>
           {editandoId && (
             <button
@@ -178,30 +199,65 @@ export default function Config() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
           {catalogo.campos.map((c) => (
-            <div key={c.key} className={c.type === 'text' ? 'md:col-span-2' : ''}>
-              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
-                {c.label}
-              </label>
-              {c.type === 'text' ? (
-                <input
-                  type="text"
-                  value={form[c.key] ?? ''}
-                  onChange={(e) => setForm({ ...form, [c.key]: e.target.value })}
-                  className="
-                    w-full rounded-lg border border-slate-300 bg-white text-slate-900
-                    px-3 py-2 text-sm
-                    dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100
-                  "
-                />
+            <div
+              key={c.key}
+              className={
+                c.type === "text"
+                  ? "md:col-span-2"
+                  : c.type === "checkbox"
+                    ? "flex items-center h-full pt-6" // Centra y alinea el checkbox con el resto
+                    : ""
+              }
+            >
+              {c.type === "checkbox" ? (
+                // --- RENDERIZADO DEL CHECKBOX ---
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={c.key}
+                    checked={form[c.key] ?? true}
+                    onChange={(e) =>
+                      setForm({ ...form, [c.key]: e.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-[#009688] focus:ring-[#009688] dark:border-slate-700 dark:bg-slate-800"
+                  />
+                  <label
+                    htmlFor={c.key}
+                    className="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer select-none"
+                  >
+                    {c.label}
+                  </label>
+                </div>
               ) : (
-                <ComboboxSelect
-                  value={form[c.key]}
-                  onChange={(v) => setForm({ ...form, [c.key]: v })}
-                  options={opcionesFK[c.fkTable] || []}
-                  placeholder={`${c.label}...`}
-                />
+                // --- RENDERIZADO DE TEXTO O SELECT ---
+                <div className="w-full">
+                  <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    {c.label}
+                  </label>
+                  {c.type === "text" ? (
+                    <input
+                      type="text"
+                      value={form[c.key] || ""}
+                      onChange={(e) =>
+                        setForm({ ...form, [c.key]: e.target.value })
+                      }
+                      className="
+                        w-full rounded-lg border border-slate-300 bg-white text-slate-900
+                        px-3 py-2 text-sm
+                        dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100
+                      "
+                    />
+                  ) : (
+                    <ComboboxSelect
+                      value={form[c.key]}
+                      onChange={(v) => setForm({ ...form, [c.key]: v })}
+                      options={opcionesFK[c.fkTable] || []}
+                      placeholder={`${c.label}...`}
+                    />
+                  )}
+                </div>
               )}
             </div>
           ))}
@@ -210,9 +266,13 @@ export default function Config() {
             <button
               type="submit"
               disabled={guardando}
-              className="rounded-lg text-white text-sm font-medium px-4 py-2 disabled:opacity-50 bg-[#009688] hover:bg-[#007f70]"
+              className="w-full md:w-auto rounded-lg text-white text-sm font-medium px-4 py-2 disabled:opacity-50 bg-[#009688] hover:bg-[#007f70]"
             >
-              {guardando ? 'Guardando...' : editandoId ? 'Guardar cambios' : 'Agregar'}
+              {guardando
+                ? "Guardando..."
+                : editandoId
+                  ? "Guardar cambios"
+                  : "Agregar"}
             </button>
           </div>
         </div>
@@ -229,7 +289,9 @@ export default function Config() {
             <tr>
               <th className="text-left px-4 py-2">Nombre</th>
               {camposFK.map((c) => (
-                <th key={c.key} className="text-left px-4 py-2">{c.label}</th>
+                <th key={c.key} className="text-left px-4 py-2">
+                  {c.label}
+                </th>
               ))}
               <th className="text-right px-4 py-2">Acciones</th>
             </tr>
@@ -237,24 +299,36 @@ export default function Config() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={2 + camposFK.length} className="text-center text-slate-400 py-6">
+                <td
+                  colSpan={2 + camposFK.length}
+                  className="text-center text-slate-400 py-6"
+                >
                   Cargando...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={2 + camposFK.length} className="text-center text-slate-400 py-6">
+                <td
+                  colSpan={2 + camposFK.length}
+                  className="text-center text-slate-400 py-6"
+                >
                   Sin registros todavía.
                 </td>
               </tr>
             ) : (
               items.map((item) => (
-                <tr key={item.id} className="border-t border-slate-100 dark:border-slate-800">
+                <tr
+                  key={item.id}
+                  className="border-t border-slate-100 dark:border-slate-800"
+                >
                   <td className="px-4 py-2 text-slate-700 dark:text-slate-300">
                     {item.nombre}
                   </td>
                   {camposFK.map((c) => (
-                    <td key={c.key} className="px-4 py-2 text-slate-500 dark:text-slate-400">
+                    <td
+                      key={c.key}
+                      className="px-4 py-2 text-slate-500 dark:text-slate-400"
+                    >
                       {nombreFK(c.fkTable, item[c.key])}
                     </td>
                   ))}
@@ -308,7 +382,6 @@ export default function Config() {
           </tbody>
         </table>
       </div>
-
     </div>
-  )
+  );
 }

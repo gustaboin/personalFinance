@@ -11,6 +11,7 @@ import Proyectos from "./pages/Proyectos";
 import Prestamos from "./pages/Prestamos";
 import Config from "./pages/Config";
 import SaldosModal from "./components/SaldosModal";
+import Inversiones from "./pages/Inversiones";
 
 import {
   LayoutDashboard,
@@ -25,6 +26,7 @@ import {
   Cog,
   LogOut,
   Wallet,
+  PiggyBank,
 } from "lucide-react";
 
 const TABS = [
@@ -76,10 +78,19 @@ const CONFIG_TAB = {
   component: Config,
 };
 
+// Inversiones fuera del menú de tabs, vive en el header con su propio PIN
+const INVERSIONES_TAB = {
+  id: "inversiones",
+  label: "Inversiones",
+  icon: PiggyBank,
+  component: Inversiones,
+};
+
 function Shell() {
   const { session, signOut } = useAuth();
   const [tab, setTab] = useState("dashboard");
   const [saldosAbierto, setSaldosAbierto] = useState(false);
+
   // Recuperar el tema guardado
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem("theme") === "dark";
@@ -98,13 +109,16 @@ function Shell() {
     }
   }, [darkMode]);
 
-  // El tab activo puede ser uno de TABS o el de Config (que vive aparte)
+  // Selección limpia del componente activo (Soporta Tabs diarios, Config e Inversiones)
   const ActiveComponent =
     tab === CONFIG_TAB.id
       ? CONFIG_TAB.component
-      : (TABS.find((t) => t.id === tab)?.component ?? Dashboard);
+      : tab === INVERSIONES_TAB.id
+        ? INVERSIONES_TAB.component
+        : (TABS.find((t) => t.id === tab)?.component ?? Dashboard);
 
   const enConfig = tab === CONFIG_TAB.id;
+  const enInversiones = tab === INVERSIONES_TAB.id;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100">
@@ -131,6 +145,40 @@ function Shell() {
               {session?.user?.email}
             </span>
 
+            {/* Botón Inversiones (en el header con PIN) */}
+            <button
+              onClick={() => setTab(INVERSIONES_TAB.id)}
+              title="Inversiones"
+              className={`h-9 w-9 flex items-center justify-center rounded-lg transition-colors ${
+                enInversiones
+                  ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
+                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+              }`}
+            >
+              <PiggyBank size={20} strokeWidth={2} />
+            </button>
+
+            <button
+              onClick={() => setSaldosAbierto(true)}
+              title="Ver saldos"
+              className="h-9 w-9 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors"
+            >
+              <Wallet size={18} strokeWidth={2} />
+            </button>
+
+            {/* Botón Config */}
+            <button
+              onClick={() => setTab(CONFIG_TAB.id)}
+              title="Configuración"
+              className={`h-9 w-9 flex items-center justify-center rounded-lg transition-colors ${
+                enConfig
+                  ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
+                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+              }`}
+            >
+              <Cog size={18} strokeWidth={2} />
+            </button>
+
             {/* Botón modo oscuro */}
             <button
               onClick={() => setDarkMode((value) => !value)}
@@ -152,27 +200,6 @@ function Shell() {
             </button>
 
             <button
-              onClick={() => setSaldosAbierto(true)}
-              title="Ver saldos"
-              className="h-9 w-9 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors"
-            >
-              <Wallet size={18} strokeWidth={2} />
-            </button>
-
-            {/* Botón Config (tuerquita), separado del menú de tabs */}
-            <button
-              onClick={() => setTab(CONFIG_TAB.id)}
-              title="Configuración"
-              className={`h-9 w-9 flex items-center justify-center rounded-lg transition-colors ${
-                enConfig
-                  ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white"
-                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-              }`}
-            >
-              <Cog size={18} strokeWidth={2} />
-            </button>
-
-            <button
               onClick={signOut}
               className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition"
             >
@@ -182,7 +209,7 @@ function Shell() {
           </div>
         </div>
 
-        {/* Menú de tabs de uso diario (Config no vive acá) */}
+        {/* Menú de tabs de uso diario */}
         <div className="border-t border-slate-100 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/50">
           <nav className="max-w-5xl mx-auto px-4 py-2 overflow-x-auto">
             <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-900">
@@ -201,7 +228,6 @@ function Shell() {
                     }`}
                   >
                     <Icon size={16} strokeWidth={2} />
-
                     {t.label}
                   </button>
                 );
@@ -214,6 +240,7 @@ function Shell() {
       <main className="max-w-5xl mx-auto px-4 py-6">
         <ActiveComponent />
       </main>
+
       <SaldosModal
         open={saldosAbierto}
         onClose={() => setSaldosAbierto(false)}

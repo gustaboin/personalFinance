@@ -1,75 +1,91 @@
-import { useEffect, useState } from 'react'
-import MonthSwitcher from '../components/MonthSwitcher'
-import { currentMesPeriodo, formatARS } from '../lib/format'
+import { useEffect, useState } from "react";
+import MonthSwitcher from "../components/MonthSwitcher";
+import { currentMesPeriodo, formatARS } from "../lib/format";
 import {
-  getCategorias, getMediosPago, getMovimientosDelMes,
-  addMovimiento, updateMovimiento, deleteMovimiento,
-} from '../lib/api'
-import { Pencil, Trash2 } from 'lucide-react'
-import {getProveedores} from "../lib/api";
+  getCategorias,
+  getMediosPago,
+  getMovimientosDelMes,
+  addMovimiento,
+  updateMovimiento,
+  deleteMovimiento,
+} from "../lib/api";
+import { Pencil, Trash2 } from "lucide-react";
+import { getProveedores } from "../lib/api";
 
-const HOY = new Date().toISOString().slice(0, 10)
-const FORM_VACIO = { fecha: HOY, id_proveedor: '', categoria_id: '', medio_pago_id: '', concepto: '', moneda: 'ARS', importe: '' }
+const HOY = new Date().toISOString().slice(0, 10);
+const FORM_VACIO = {
+  fecha: HOY,
+  id_proveedor: "",
+  categoria_id: "",
+  medio_pago_id: "",
+  concepto: "",
+  moneda: "ARS",
+  importe: "",
+};
 
 export default function Movimientos() {
-  const [mesPeriodo, setMesPeriodo] = useState(currentMesPeriodo())
-  const [categorias, setCategorias] = useState([])
-  const [medios, setMedios] = useState([])
-  const [movimientos, setMovimientos] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [guardando, setGuardando] = useState(false)
-  const [error, setError] = useState(null)
-  const [editandoId, setEditandoId] = useState(null) // null = alta nueva, id = editando esa fila
-  const [proveedores, setProveedores] = useState([])
-  const [form, setForm] = useState(FORM_VACIO)
+  const [mesPeriodo, setMesPeriodo] = useState(currentMesPeriodo());
+  const [categorias, setCategorias] = useState([]);
+  const [medios, setMedios] = useState([]);
+  const [movimientos, setMovimientos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
+  const [editandoId, setEditandoId] = useState(null); // null = alta nueva, id = editando esa fila
+  const [proveedores, setProveedores] = useState([]);
+  const [form, setForm] = useState(FORM_VACIO);
 
   useEffect(() => {
-    getCategorias().then(setCategorias)
-    getMediosPago().then(setMedios)
-    getProveedores().then(setProveedores)
-  }, [])
+    getCategorias().then(setCategorias);
+    getProveedores().then(setProveedores);
+    // Traemos todos y filtramos los que tengan activo === true MEjora de visualizacion 05/10/2026
+    getMediosPago().then((data) => {
+      const mediosActivos = data.filter((m) => m.activo === true);
+      setMedios(mediosActivos);
+    });
+  }, []);
 
   useEffect(() => {
-    setLoading(true)
+    setLoading(true);
     getMovimientosDelMes(mesPeriodo).then((data) => {
-      setMovimientos(data)
-      setLoading(false)
-    })
-  }, [mesPeriodo])
+      setMovimientos(data);
+      setLoading(false);
+    });
+  }, [mesPeriodo]);
 
   async function refrescar() {
-    const data = await getMovimientosDelMes(mesPeriodo)
-    setMovimientos(data)
+    const data = await getMovimientosDelMes(mesPeriodo);
+    setMovimientos(data);
   }
 
-function empezarEdicion(m) {
-  setEditandoId(m.id)
-  setForm({
-    fecha: m.fecha,
-    id_proveedor: String(m.id_proveedor ?? ''),
-    categoria_id: String(m.categoria_id ?? ''),
-    medio_pago_id: String(m.medio_pago_id ?? ''),
-    concepto: m.concepto || '',
-    moneda: m.moneda,
-    importe: String(m.importe),
-  })
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
+  function empezarEdicion(m) {
+    setEditandoId(m.id);
+    setForm({
+      fecha: m.fecha,
+      id_proveedor: String(m.id_proveedor ?? ""),
+      categoria_id: String(m.categoria_id ?? ""),
+      medio_pago_id: String(m.medio_pago_id ?? ""),
+      concepto: m.concepto || "",
+      moneda: m.moneda,
+      importe: String(m.importe),
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   function cancelarEdicion() {
-    setEditandoId(null)
-    setForm(FORM_VACIO)
-    setError(null)
+    setEditandoId(null);
+    setForm(FORM_VACIO);
+    setError(null);
   }
 
   async function handleSubmit(e) {
-    e.preventDefault()
-    setError(null)
+    e.preventDefault();
+    setError(null);
     if (!form.categoria_id || !form.medio_pago_id || !form.importe) {
-      setError('Completá categoría, medio de pago e importe.')
-      return
+      setError("Completá categoría, medio de pago e importe.");
+      return;
     }
-    setGuardando(true)
+    setGuardando(true);
     try {
       const payload = {
         fecha: form.fecha,
@@ -79,42 +95,38 @@ function empezarEdicion(m) {
         concepto: form.concepto || null,
         moneda: form.moneda,
         importe: Number(form.importe),
-      }
+      };
       if (editandoId) {
-        await updateMovimiento(editandoId, payload)
-        setEditandoId(null)
+        await updateMovimiento(editandoId, payload);
+        setEditandoId(null);
       } else {
-        await addMovimiento(payload)
+        await addMovimiento(payload);
       }
-      setForm(FORM_VACIO)
-      await refrescar()
+      setForm(FORM_VACIO);
+      await refrescar();
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setGuardando(false)
+      setGuardando(false);
     }
   }
 
   async function handleDelete(id) {
-    if (!confirm('¿Eliminar este movimiento? No se puede deshacer.')) return
-    await deleteMovimiento(id)
-    if (editandoId === id) cancelarEdicion()
-    await refrescar()
+    if (!confirm("¿Eliminar este movimiento? No se puede deshacer.")) return;
+    await deleteMovimiento(id);
+    if (editandoId === id) cancelarEdicion();
+    await refrescar();
   }
 
- return (
+  return (
     <div className="space-y-6">
-
       {/* Título + selector de mes */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
           Movimientos
         </h2>
 
-        <MonthSwitcher
-          mesPeriodo={mesPeriodo}
-          onChange={setMesPeriodo}
-        />
+        <MonthSwitcher mesPeriodo={mesPeriodo} onChange={setMesPeriodo} />
       </div>
 
       {/* Formulario */}
@@ -136,7 +148,7 @@ function empezarEdicion(m) {
           <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
             {editandoId
               ? `Editando movimiento #${editandoId}`
-              : 'Nuevo movimiento'}
+              : "Nuevo movimiento"}
           </p>
 
           {editandoId && (
@@ -156,14 +168,11 @@ function empezarEdicion(m) {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-
           {/* Fecha */}
           <input
             type="date"
             value={form.fecha}
-            onChange={(e) =>
-              setForm({ ...form, fecha: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, fecha: e.target.value })}
             className="
               rounded-lg
               border border-slate-300
@@ -187,12 +196,10 @@ function empezarEdicion(m) {
             "
           />
           {/* Proveedor */}
-            <select
-              value={form.id_proveedor}
-              onChange={(e) =>
-                setForm({ ...form, id_proveedor: e.target.value })
-              }
-              className="
+          <select
+            value={form.id_proveedor}
+            onChange={(e) => setForm({ ...form, id_proveedor: e.target.value })}
+            className="
                 rounded-lg
                 border border-slate-300
                 bg-white
@@ -210,23 +217,20 @@ function empezarEdicion(m) {
                 dark:text-slate-100
                 dark:focus:ring-slate-700
               "
-            >
-              <option value="">Proveedor...</option>
-            
-              {proveedores.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
-            </select>
+          >
+            <option value="">Proveedor...</option>
 
+            {proveedores.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
 
           {/* Categoría */}
           <select
             value={form.categoria_id}
-            onChange={(e) =>
-              setForm({ ...form, categoria_id: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}
             className="
               rounded-lg
               border border-slate-300
@@ -292,9 +296,7 @@ function empezarEdicion(m) {
           {/* Moneda */}
           <select
             value={form.moneda}
-            onChange={(e) =>
-              setForm({ ...form, moneda: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, moneda: e.target.value })}
             className="
               rounded-lg
               border border-slate-300
@@ -322,9 +324,7 @@ function empezarEdicion(m) {
             type="text"
             placeholder="Concepto"
             value={form.concepto}
-            onChange={(e) =>
-              setForm({ ...form, concepto: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, concepto: e.target.value })}
             className="
               rounded-lg
               border border-slate-300
@@ -354,9 +354,7 @@ function empezarEdicion(m) {
             step="0.01"
             placeholder="Importe"
             value={form.importe}
-            onChange={(e) =>
-              setForm({ ...form, importe: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, importe: e.target.value })}
             className="
               rounded-lg
               border border-slate-300
@@ -386,23 +384,21 @@ function empezarEdicion(m) {
             disabled={guardando}
             className={`rounded-lg text-white text-sm font-medium px-4 py-2 disabled:opacity-50 col-span-1 transition ${
               editandoId
-                ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500'
-                : 'bg-[#009688] hover:bg-[#007f70] dark:bg-[#005f5f] dark:hover:bg-[#004a4a]'
+                ? "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                : "bg-[#009688] hover:bg-[#007f70] dark:bg-[#005f5f] dark:hover:bg-[#004a4a]"
             }`}
           >
             {guardando
-              ? 'Guardando...'
+              ? "Guardando..."
               : editandoId
-                ? 'Guardar cambios'
-                : 'Agregar'}
+                ? "Guardar cambios"
+                : "Agregar"}
           </button>
         </div>
 
         {/* Error */}
         {error && (
-          <p className="text-sm text-red-600 dark:text-red-400 mt-2">
-            {error}
-          </p>
+          <p className="text-sm text-red-600 dark:text-red-400 mt-2">{error}</p>
         )}
       </form>
 
@@ -422,7 +418,6 @@ function empezarEdicion(m) {
       >
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-
             {/* Header tabla */}
             <thead
               className="
@@ -436,25 +431,15 @@ function empezarEdicion(m) {
               "
             >
               <tr>
-                <th className="text-left px-4 py-3">
-                  Fecha
-                </th>
+                <th className="text-left px-4 py-3">Fecha</th>
 
-                <th className="text-left px-4 py-3">
-                  Categoría
-                </th>
+                <th className="text-left px-4 py-3">Categoría</th>
 
-                <th className="text-left px-4 py-3">
-                  Concepto
-                </th>
+                <th className="text-left px-4 py-3">Concepto</th>
 
-                <th className="text-left px-4 py-3">
-                  Medio
-                </th>
+                <th className="text-left px-4 py-3">Medio</th>
 
-                <th className="text-right px-4 py-3">
-                  Importe
-                </th>
+                <th className="text-right px-4 py-3">Importe</th>
 
                 <th className="px-4 py-3"></th>
               </tr>
@@ -491,12 +476,11 @@ function empezarEdicion(m) {
 
                       ${
                         editandoId === m.id
-                          ? 'bg-amber-50 dark:bg-amber-950/30'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                          ? "bg-amber-50 dark:bg-amber-950/30"
+                          : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
                       }
                     `}
                   >
-
                     {/* Fecha */}
                     <td className="px-4 py-3 whitespace-nowrap text-slate-700 dark:text-slate-300">
                       {m.fecha}
@@ -520,21 +504,19 @@ function empezarEdicion(m) {
                     {/* Importe */}
                     <td
                       className={`px-4 py-3 text-right font-medium ${
-                        m.categorias?.tipos_movimiento?.nombre === 'Ingreso'
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-slate-900 dark:text-white'
+                        m.categorias?.tipos_movimiento?.nombre === "Ingreso"
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-slate-900 dark:text-white"
                       }`}
                     >
-                      {m.moneda === 'USD'
+                      {m.moneda === "USD"
                         ? `US$ ${m.importe}`
                         : formatARS(m.importe)}
                     </td>
 
                     {/* Acciones */}
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-
                       <div className="flex items-center justify-end gap-2">
-
                         {/* Editar */}
                         <button
                           onClick={() => empezarEdicion(m)}
@@ -584,19 +566,15 @@ function empezarEdicion(m) {
                           <Trash2 size={13} />
                           Eliminar
                         </button>
-
                       </div>
                     </td>
-
                   </tr>
                 ))
               )}
             </tbody>
-
           </table>
         </div>
       </div>
-
     </div>
-  )
+  );
 }
