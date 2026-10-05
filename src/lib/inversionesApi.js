@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { supabase } from "./supabaseClient.js";
 
 // --- Lectura ---
 
@@ -22,6 +22,14 @@ export async function getResumenCuenta(cuentaId) {
   return data;
 }
 
+export async function getResumenPorTicker() {
+  const { data, error } = await supabase
+    .from("vw_inversiones_resumen_ticker")
+    .select("*");
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function getPin() {
   const { data, error } = await supabase
     .from("app_config")
@@ -33,8 +41,10 @@ export async function getPin() {
 }
 
 // --- Alta: compra de un activo ---
-// 1) registra la posición  2) registra el egreso real de la cuenta (Balanz ARS o Balanz USD según la moneda de la compra).
-// No está envuelto en una transacción SQL real -- si el segundo paso falla, borrar el primero a mano (catch).
+// Hace 2 cosas: 1) registra la posición  2) registra el egreso real
+// de la cuenta (Balanz ARS o Balanz USD según la moneda de la compra).
+// No está envuelto en una transacción SQL real -- si el segundo paso
+// falla, borra el primero a mano (ver catch).
 
 export async function addCompraInversion({
   cuentaId,
