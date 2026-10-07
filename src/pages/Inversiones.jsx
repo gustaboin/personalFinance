@@ -15,7 +15,7 @@ import {
   addCompraInversion,
   deleteCompraInversion,
 } from "../lib/inversionesApi";
-import { getCuentas } from "../lib/CuentasApi";
+import { getCuentas } from "../lib/Cuentasapi";
 
 const COLORES = [
   "#2563eb",

@@ -13,6 +13,7 @@ const DIAS_HACIA_ATRAS = 5
 const CASAS = [
   { casa: 'oficial', moneda: 'USD' },
   { casa: 'contadoconliqui', moneda: 'USD_CCL' },
+  { casa: 'bolsa', moneda: 'USD_MEP' }
 ]
 
 function formatearFechaApi(d: Date) {
