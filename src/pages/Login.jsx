@@ -31,7 +31,7 @@ export default function Login() {
             <Broccoli className="h-6 w-6 text-emerald-400" />
           </div>
 
-          <h1 className="text-2xl font-semibold text-slate-900">Col-App</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">ColVa</h1>
           <p className="text-slate-500 text-sm mt-1">
             Ingresa con tu cuenta para continuar
           </p>
