@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient.js";
+import { supabase } from "./supabaseClient";
 
 // --- Lectura ---
 
@@ -26,6 +26,27 @@ export async function getResumenPorTicker() {
   const { data, error } = await supabase
     .from("vw_inversiones_resumen_ticker")
     .select("*");
+  if (error) throw error;
+  return data ?? [];
+}
+
+// --- Exposición de la cartera (vistas vw_exposicion_*) ---
+// Se traen las filas por cuenta y el total / agrupación por región se arma
+// en el front: así un solo fetch sirve para "Todos los brokers" y para cada broker,
+// y no depende del formato de vw_exposicion_region_total.
+
+export async function getExposicionRama() {
+  const { data, error } = await supabase
+    .from("vw_exposicion_rama")
+    .select("cuenta_id, rama, valor_usd");
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getExposicionPais() {
+  const { data, error } = await supabase
+    .from("vw_exposicion_pais")
+    .select("cuenta_id, region, pais, valor_usd");
   if (error) throw error;
   return data ?? [];
 }

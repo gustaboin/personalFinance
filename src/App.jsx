@@ -27,6 +27,7 @@ import {
   LogOut,
   Wallet,
   PiggyBank,
+  Broccoli,
 } from "lucide-react";
 
 const TABS = [
@@ -126,8 +127,12 @@ function Shell() {
         {/* Header principal */}
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-slate-900 text-emerald-400 flex items-center justify-center text-sm font-bold shadow-sm dark:bg-slate-800">
-              $
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-white mb-4 shadow-sm">
+              <Broccoli
+                size={20}
+                strokeWidth={2}
+                className="h-6 w-6 text-slate-900"
+              />
             </div>
 
             <span className="text-lg tracking-tight">

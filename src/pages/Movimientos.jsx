@@ -35,6 +35,9 @@ export default function Movimientos() {
   const [proveedores, setProveedores] = useState([]);
   const [form, setForm] = useState(FORM_VACIO);
 
+  // Estado para el modal de confirmación de eliminación
+  const [idItemAEliminar, setIdItemAEliminar] = useState(null);
+
   useEffect(() => {
     getCategorias().then(setCategorias);
     getProveedores().then(setProveedores);
@@ -111,11 +114,21 @@ export default function Movimientos() {
     }
   }
 
-  async function handleDelete(id) {
-    if (!confirm("¿Eliminar este movimiento? No se puede deshacer.")) return;
-    await deleteMovimiento(id);
-    if (editandoId === id) cancelarEdicion();
-    await refrescar();
+  // Funciones usando el modal estético de confirmación
+  function confirmarEliminar(id) {
+    setIdItemAEliminar(id);
+  }
+
+  async function ejecutarEliminacion() {
+    if (!idItemAEliminar) return;
+    try {
+      await deleteMovimiento(idItemAEliminar);
+      if (editandoId === idItemAEliminar) cancelarEdicion();
+      setIdItemAEliminar(null);
+      await refrescar();
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   return (
@@ -544,7 +557,7 @@ export default function Movimientos() {
 
                         {/* Eliminar */}
                         <button
-                          onClick={() => handleDelete(m.id)}
+                          onClick={() => confirmarEliminar(m.id)}
                           className="
                             inline-flex
                             items-center
@@ -575,6 +588,43 @@ export default function Movimientos() {
           </table>
         </div>
       </div>
+
+      {/* Modal de confirmación de eliminación */}
+      {idItemAEliminar && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setIdItemAEliminar(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              ¿Eliminar movimiento?
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+              Esta acción no se puede deshacer. Se borrará el registro
+              seleccionado de la lista.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIdItemAEliminar(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={ejecutarEliminacion}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 transition-colors"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -11,11 +11,14 @@ import {
   getPosiciones,
   getResumenCuenta,
   getResumenPorTicker,
+  getExposicionRama,
+  getExposicionPais,
   getPin,
   addCompraInversion,
   deleteCompraInversion,
 } from "../lib/inversionesApi";
-import { getCuentas } from "../lib/Cuentasapi";
+import { Maximize2, X, Trash2 } from "lucide-react";
+import { getCuentas } from "../lib/cuentasApi";
 
 const COLORES = [
   "#2563eb",
@@ -49,6 +52,195 @@ const FORM_VACIO = {
   tcCcl: "",
   notas: "",
 };
+
+// --- Exposición: por rama / país / región, total o por broker ---
+const DIMENSIONES = [
+  { id: "rama", label: "Rama" },
+  { id: "pais", label: "País" },
+  { id: "region", label: "Región" },
+];
+
+function agrupar(filas, campo) {
+  const acc = {};
+  for (const f of filas) {
+    const k = f[campo] || "Sin clasificar";
+    acc[k] = (acc[k] || 0) + Number(f.valor_usd || 0);
+  }
+  const total = Object.values(acc).reduce((s, v) => s + v, 0);
+  return Object.entries(acc)
+    .map(([nombre, valor]) => ({
+      nombre,
+      valor,
+      pct: total > 0 ? (valor / total) * 100 : 0,
+    }))
+    .sort((a, b) => b.valor - a.valor);
+}
+
+function ExposicionCartera({ cuentaId, nombreCuenta }) {
+  const [ramaRows, setRamaRows] = useState([]);
+  const [paisRows, setPaisRows] = useState([]);
+  const [dim, setDim] = useState("rama");
+  const [alcance, setAlcance] = useState("total"); // 'total' | 'broker'
+  const [expandido, setExpandido] = useState(false);
+
+  // Cerrar con Esc
+  useEffect(() => {
+    if (!expandido) return;
+    const onKey = (e) => e.key === "Escape" && setExpandido(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expandido]);
+
+  useEffect(() => {
+    getExposicionRama().then(setRamaRows).catch(console.error);
+    getExposicionPais().then(setPaisRows).catch(console.error);
+  }, []);
+
+  const datos = useMemo(() => {
+    const filtrar = (rows) =>
+      alcance === "broker"
+        ? rows.filter((r) => String(r.cuenta_id) === String(cuentaId))
+        : rows;
+    if (dim === "rama") return agrupar(filtrar(ramaRows), "rama");
+    return agrupar(filtrar(paisRows), dim);
+  }, [dim, alcance, cuentaId, ramaRows, paisRows]);
+
+  const total = datos.reduce((s, d) => s + d.valor, 0);
+
+  if (ramaRows.length === 0 && paisRows.length === 0) return null;
+
+  const pill = (activo) =>
+    `px-3 py-1 text-xs font-medium rounded-md transition ${
+      activo
+        ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200 dark:bg-slate-700 dark:text-white dark:ring-slate-600"
+        : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+    }`;
+
+  const contenido = (grande) => (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+          Exposición de la cartera
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
+            <button
+              className={pill(alcance === "total")}
+              onClick={() => setAlcance("total")}
+            >
+              Todos
+            </button>
+            <button
+              className={pill(alcance === "broker")}
+              onClick={() => setAlcance("broker")}
+            >
+              {nombreCuenta || "Broker"}
+            </button>
+          </div>
+          <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
+            {DIMENSIONES.map((d) => (
+              <button
+                key={d.id}
+                className={pill(dim === d.id)}
+                onClick={() => setDim(d.id)}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setExpandido(!grande)}
+            title={grande ? "Cerrar" : "Ampliar"}
+            className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors"
+          >
+            {grande ? <X size={16} /> : <Maximize2 size={16} />}
+          </button>
+        </div>
+      </div>
+      <p className="text-xs text-slate-400 mb-4">
+        {alcance === "total" ? "Suma de todos los brokers" : nombreCuenta} ·{" "}
+        {formatUSD(total)} · look-through de ETFs/CEDEARs
+      </p>
+
+      {datos.length === 0 ? (
+        <p className="text-sm text-slate-400 py-6 text-center">
+          Sin datos de exposición.
+        </p>
+      ) : (
+        <div
+          className={`grid gap-6 ${grande ? "lg:grid-cols-2" : "md:grid-cols-2"}`}
+        >
+          <ResponsiveContainer width="100%" height={grande ? 420 : 240}>
+            <PieChart>
+              <Pie
+                data={datos}
+                dataKey="valor"
+                nameKey="nombre"
+                cx="50%"
+                cy="50%"
+                outerRadius={grande ? 150 : 85}
+              >
+                {datos.map((_, i) => (
+                  <Cell key={i} fill={COLORES[i % COLORES.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(v) => formatUSD(v)} />
+            </PieChart>
+          </ResponsiveContainer>
+
+          <div
+            className={`space-y-2 overflow-y-auto pr-1 ${grande ? "max-h-[420px]" : "max-h-60"}`}
+          >
+            {datos.map((d, i) => (
+              <div
+                key={d.nombre}
+                className="flex items-center justify-between rounded-lg px-3 py-2 bg-slate-50 dark:bg-slate-800"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: COLORES[i % COLORES.length] }}
+                  />
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {d.nombre}
+                  </p>
+                </div>
+                <div className="text-right shrink-0 pl-3">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {formatUSD(d.valor)}
+                  </p>
+                  <p className="text-xs text-slate-400">{d.pct.toFixed(1)}%</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <>
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+        {contenido(false)}
+      </div>
+
+      {expandido && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setExpandido(false)}
+        >
+          <div
+            className="w-full max-w-5xl max-h-[92vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {contenido(true)}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 // --- Gate de PIN ---
 function PinGate({ onDesbloquear }) {
@@ -113,13 +305,15 @@ function InversionesContenido() {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
+  // Estado para el modal de confirmación de eliminación
+  const [idItemAEliminar, setIdItemAEliminar] = useState(null);
+
   useEffect(() => {
     getCuentas().then((data) => {
       const brokers = data.filter((c) => c.tipo === "broker");
       setCuentasBroker(brokers);
       if (brokers.length > 0) setCuentaId(String(brokers[0].id));
     });
-    // Resumen por ticker: no depende de la cuenta seleccionada, se carga una sola vez
     getResumenPorTicker().then(setResumenTicker);
   }, []);
 
@@ -199,15 +393,21 @@ function InversionesContenido() {
     }
   }
 
-  async function handleDelete(id) {
-    if (
-      !confirm(
-        "¿Eliminar esta posición? También se borra el egreso que generó en la cuenta.",
-      )
-    )
-      return;
-    await deleteCompraInversion(id);
-    cargar();
+  // Funciones de eliminación usando la tarjeta de confirmación
+  function confirmarEliminar(id) {
+    setIdItemAEliminar(id);
+  }
+
+  async function ejecutarEliminacion() {
+    if (!idItemAEliminar) return;
+    try {
+      await deleteCompraInversion(idItemAEliminar);
+      setIdItemAEliminar(null);
+      cargar();
+    } catch (err) {
+      console.error(err);
+      alert("No se pudo eliminar: " + err.message);
+    }
   }
 
   return (
@@ -239,7 +439,6 @@ function InversionesContenido() {
         </div>
       </div>
 
-      {/* Resumen por activo, todos los brokers juntos */}
       {resumenTicker.length > 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
@@ -307,7 +506,13 @@ function InversionesContenido() {
         </div>
       )}
 
-      {/* Resumen de la cuenta seleccionada */}
+      <ExposicionCartera
+        cuentaId={cuentaId}
+        nombreCuenta={
+          cuentasBroker.find((c) => String(c.id) === String(cuentaId))?.nombre
+        }
+      />
+
       {resumen && (
         <div className="grid grid-cols-3 gap-4">
           <div className="rounded-xl bg-slate-50 dark:bg-slate-800 p-4">
@@ -339,8 +544,8 @@ function InversionesContenido() {
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 text-xs uppercase">
             <tr>
               <th className="text-left px-4 py-2">Fecha</th>
@@ -387,9 +592,10 @@ function InversionesContenido() {
                   </td>
                   <td className="px-4 py-2 text-right">
                     <button
-                      onClick={() => handleDelete(p.id)}
-                      className="text-red-600 dark:text-red-400 hover:underline text-xs"
+                      onClick={() => confirmarEliminar(p.id)}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1.5 text-xs font-medium transition-colors dark:bg-rose-600 dark:hover:bg-rose-500"
                     >
+                      <Trash2 size={13} />
                       Eliminar
                     </button>
                   </td>
@@ -399,6 +605,43 @@ function InversionesContenido() {
           </tbody>
         </table>
       </div>
+
+      {/* Modal de confirmación de eliminación */}
+      {idItemAEliminar && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setIdItemAEliminar(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              ¿Eliminar posición?
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+              Esta acción no se puede deshacer. También se borrará el egreso
+              generado automáticamente en la cuenta.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIdItemAEliminar(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={ejecutarEliminacion}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 transition-colors"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalAbierto && (
         <div

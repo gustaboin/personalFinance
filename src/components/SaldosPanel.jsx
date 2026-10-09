@@ -3,7 +3,7 @@ import {
   getCuentas,
   addTransferencia,
   getTransferenciasRecientes,
-} from "../lib/Cuentasapi";
+} from "../lib/cuentasApi";
 import {
   Landmark,
   Smartphone,
