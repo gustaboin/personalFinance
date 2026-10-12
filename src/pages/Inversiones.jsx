@@ -9,13 +9,14 @@ import {
 } from "recharts";
 import {
   getPosiciones,
-  getResumenCuenta,
-  getResumenPorTicker,
   getExposicionRama,
   getExposicionPais,
   getPin,
   addCompraInversion,
   deleteCompraInversion,
+  getVentas,
+  addVentaInversion,
+  deleteVentaInversion,
 } from "../lib/inversionesApi";
 import { Maximize2, X, Trash2 } from "lucide-react";
 import { getCuentas } from "../lib/cuentasApi";
@@ -53,6 +54,25 @@ const FORM_VACIO = {
   notas: "",
 };
 
+const FORM_VENTA_VACIO = {
+  ticker: "",
+  boletoNumero: "",
+  fechaOperacion: new Date().toISOString().slice(0, 10),
+  cantidad: "",
+  moneda: "ARS",
+  precioUnitarioBruto: "",
+  importeBruto: "",
+  arancel: "",
+  comision: "",
+  importeNeto: "",
+  tcMep: "",
+  tcCcl: "",
+  notas: "",
+};
+
+const INPUT =
+  "rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100";
+
 // --- Exposición: por rama / país / región, total o por broker ---
 const DIMENSIONES = [
   { id: "rama", label: "Rama" },
@@ -77,10 +97,11 @@ function agrupar(filas, campo) {
 }
 
 function ExposicionCartera({ cuentaId, nombreCuenta }) {
+  // cuentaId === "todos" -> suma de todos los brokers
   const [ramaRows, setRamaRows] = useState([]);
   const [paisRows, setPaisRows] = useState([]);
   const [dim, setDim] = useState("rama");
-  const [alcance, setAlcance] = useState("total"); // 'total' | 'broker'
+  const alcance = cuentaId === "todos" ? "total" : "broker";
   const [expandido, setExpandido] = useState(false);
 
   // Cerrar con Esc
@@ -123,20 +144,6 @@ function ExposicionCartera({ cuentaId, nombreCuenta }) {
           Exposición de la cartera
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
-            <button
-              className={pill(alcance === "total")}
-              onClick={() => setAlcance("total")}
-            >
-              Todos
-            </button>
-            <button
-              className={pill(alcance === "broker")}
-              onClick={() => setAlcance("broker")}
-            >
-              {nombreCuenta || "Broker"}
-            </button>
-          </div>
           <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
             {DIMENSIONES.map((d) => (
               <button
@@ -297,8 +304,8 @@ function InversionesContenido() {
   const [cuentasBroker, setCuentasBroker] = useState([]);
   const [cuentaId, setCuentaId] = useState("");
   const [posiciones, setPosiciones] = useState([]);
-  const [resumen, setResumen] = useState(null);
-  const [resumenTicker, setResumenTicker] = useState([]);
+  const [ventas, setVentas] = useState([]);
+  const [refreshKey, setRefreshKey] = useState(0); // fuerza recarga de la exposición
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(FORM_VACIO);
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -307,6 +314,13 @@ function InversionesContenido() {
 
   // Estado para el modal de confirmación de eliminación
   const [idItemAEliminar, setIdItemAEliminar] = useState(null);
+  const [idVentaAEliminar, setIdVentaAEliminar] = useState(null);
+
+  // Venta
+  const [ventaModal, setVentaModal] = useState(false);
+  const [formVenta, setFormVenta] = useState(FORM_VENTA_VACIO);
+
+  const esTodos = cuentaId === "todos";
 
   useEffect(() => {
     getCuentas().then((data) => {
@@ -314,25 +328,77 @@ function InversionesContenido() {
       setCuentasBroker(brokers);
       if (brokers.length > 0) setCuentaId(String(brokers[0].id));
     });
-    getResumenPorTicker().then(setResumenTicker);
   }, []);
 
-  const totalValorCartera = useMemo(
-    () =>
-      resumenTicker.reduce((s, r) => s + Number(r.valor_actual_total_usd), 0),
-    [resumenTicker],
+  // Cartera por activo: se arma desde las posiciones (una cuenta o todas)
+  const resumenTicker = useMemo(() => {
+    const m = {};
+    for (const p of posiciones) {
+      const r = (m[p.ticker] ??= {
+        ticker: p.ticker,
+        nominales_total: 0,
+        valor_actual_total_usd: 0,
+        costo_con_costo: 0,
+        valor_con_costo: 0,
+      });
+      r.nominales_total += Number(p.cantidad_actual ?? p.cantidad);
+      r.valor_actual_total_usd += Number(p.valor_actual_usd || 0);
+      if (p.costo_usd != null) {
+        r.costo_con_costo += Number(p.costo_usd);
+        r.valor_con_costo += Number(p.valor_actual_usd || 0);
+      }
+    }
+    return Object.values(m)
+      .map((r) => ({
+        ...r,
+        rendimiento_usd: r.valor_con_costo - r.costo_con_costo,
+      }))
+      .sort((a, b) => b.valor_actual_total_usd - a.valor_actual_total_usd);
+  }, [posiciones]);
+
+  const totalValorCartera = resumenTicker.reduce(
+    (s, r) => s + r.valor_actual_total_usd,
+    0,
   );
+
+  // Tarjetas Invertido / Valor actual / Rendimiento
+  const resumen = useMemo(() => {
+    if (posiciones.length === 0) return null;
+    let costo = 0,
+      actual = 0,
+      actualConCosto = 0;
+    for (const p of posiciones) {
+      actual += Number(p.valor_actual_usd || 0);
+      if (p.costo_usd != null) {
+        costo += Number(p.costo_usd);
+        actualConCosto += Number(p.valor_actual_usd || 0);
+      }
+    }
+    return {
+      total_costo_usd: costo,
+      total_actual_usd: actual,
+      rendimiento_usd: actualConCosto - costo,
+    };
+  }, [posiciones]);
+
+  // Tickers que tengo en la cuenta elegida (para el form de venta)
+  const tenencias = useMemo(() => {
+    const m = {};
+    for (const p of posiciones)
+      m[p.ticker] =
+        (m[p.ticker] || 0) + Number(p.cantidad_actual ?? p.cantidad);
+    return m;
+  }, [posiciones]);
 
   function cargar() {
     if (!cuentaId) return;
+    const filtro = esTodos ? null : Number(cuentaId);
     setLoading(true);
-    Promise.all([
-      getPosiciones(Number(cuentaId)),
-      getResumenCuenta(Number(cuentaId)),
-    ])
-      .then(([pos, res]) => {
+    setRefreshKey((k) => k + 1);
+    Promise.all([getPosiciones(filtro), getVentas(filtro)])
+      .then(([pos, vtas]) => {
         setPosiciones(pos);
-        setResumen(res);
+        setVentas(vtas);
       })
       .finally(() => setLoading(false));
   }
@@ -410,6 +476,72 @@ function InversionesContenido() {
     }
   }
 
+  function abrirVenta() {
+    setFormVenta({
+      ...FORM_VENTA_VACIO,
+      fechaOperacion: new Date().toISOString().slice(0, 10),
+    });
+    setError("");
+    setVentaModal(true);
+  }
+
+  async function handleVenta(e) {
+    e.preventDefault();
+    setError("");
+    if (!formVenta.ticker || !formVenta.cantidad || !formVenta.importeNeto) {
+      setError("Completá ticker, cantidad e importe neto cobrado.");
+      return;
+    }
+    if (formVenta.moneda === "ARS" && !formVenta.tcMep && !formVenta.tcCcl) {
+      setError(
+        "Si cobraste en ARS, cargá el MEP o el CCL de ese día (para medir el resultado en USD).",
+      );
+      return;
+    }
+    setGuardando(true);
+    try {
+      await addVentaInversion({
+        cuentaId: Number(cuentaId),
+        ticker: formVenta.ticker,
+        boletoNumero: formVenta.boletoNumero,
+        fechaOperacion: formVenta.fechaOperacion,
+        cantidad: Number(formVenta.cantidad),
+        moneda: formVenta.moneda,
+        precioUnitarioBruto: formVenta.precioUnitarioBruto
+          ? Number(formVenta.precioUnitarioBruto)
+          : null,
+        importeBruto: formVenta.importeBruto
+          ? Number(formVenta.importeBruto)
+          : null,
+        arancel: formVenta.arancel ? Number(formVenta.arancel) : null,
+        comision: formVenta.comision ? Number(formVenta.comision) : null,
+        importeNeto: Number(formVenta.importeNeto),
+        tcMep: formVenta.tcMep ? Number(formVenta.tcMep) : null,
+        tcCcl: formVenta.tcCcl ? Number(formVenta.tcCcl) : null,
+        notas: formVenta.notas,
+      });
+      setVentaModal(false);
+      cargar();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "No se pudo guardar la venta.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function ejecutarEliminacionVenta() {
+    if (!idVentaAEliminar) return;
+    try {
+      await deleteVentaInversion(idVentaAEliminar);
+      setIdVentaAEliminar(null);
+      cargar();
+    } catch (err) {
+      console.error(err);
+      alert("No se pudo eliminar la venta: " + err.message);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -428,13 +560,24 @@ function InversionesContenido() {
                 {c.nombre}
               </option>
             ))}
+            <option value="todos">Todos</option>
           </select>
 
           <button
             onClick={abrirModal}
-            className="rounded-lg text-white text-sm font-medium px-4 py-2 bg-[#009688] hover:bg-[#007f70]"
+            disabled={esTodos}
+            title={esTodos ? "Elegí un broker para cargar una compra" : ""}
+            className="rounded-lg text-white text-sm font-medium px-4 py-2 bg-[#009688] hover:bg-[#007f70] disabled:opacity-40 disabled:cursor-not-allowed"
           >
             + Compra
+          </button>
+          <button
+            onClick={abrirVenta}
+            disabled={esTodos}
+            title={esTodos ? "Elegí un broker para cargar una venta" : ""}
+            className="rounded-lg text-white text-sm font-medium px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            − Venta
           </button>
         </div>
       </div>
@@ -442,10 +585,14 @@ function InversionesContenido() {
       {resumenTicker.length > 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
-            Cartera total por activo
+            {esTodos ? "Cartera total por activo" : "Cartera por activo"}
           </p>
           <p className="text-xs text-slate-400 mb-4">
-            Suma de todos los brokers · {formatUSD(totalValorCartera)}
+            {esTodos
+              ? "Suma de todos los brokers"
+              : cuentasBroker.find((c) => String(c.id) === String(cuentaId))
+                  ?.nombre}{" "}
+            · {formatUSD(totalValorCartera)}
           </p>
 
           <div className="grid md:grid-cols-2 gap-6">
@@ -507,6 +654,7 @@ function InversionesContenido() {
       )}
 
       <ExposicionCartera
+        key={refreshKey}
         cuentaId={cuentaId}
         nombreCuenta={
           cuentasBroker.find((c) => String(c.id) === String(cuentaId))?.nombre
@@ -544,16 +692,25 @@ function InversionesContenido() {
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm">
+      <p className="md:hidden text-xs text-slate-400 -mb-3 text-right">
+        Deslizá la tabla hacia los costados ↔
+      </p>
+      <div
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-x-auto pb-2
+        [&::-webkit-scrollbar]:h-2.5
+        [&::-webkit-scrollbar-track]:bg-slate-100 dark:[&::-webkit-scrollbar-track]:bg-slate-800
+        [&::-webkit-scrollbar-thumb]:rounded-full
+        [&::-webkit-scrollbar-thumb]:bg-slate-400 dark:[&::-webkit-scrollbar-thumb]:bg-slate-500"
+      >
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 text-xs uppercase">
             <tr>
-              <th className="text-left px-4 py-2">Fecha</th>
-              <th className="text-left px-4 py-2">Ticker</th>
-              <th className="text-right px-4 py-2">Nominales</th>
-              <th className="text-right px-4 py-2">Costo USD</th>
-              <th className="text-right px-4 py-2">Valor hoy</th>
-              <th className="text-right px-4 py-2">Acciones</th>
+              <th className="text-left px-3 py-2">Fecha</th>
+              <th className="text-left px-3 py-2">Ticker</th>
+              <th className="text-right px-3 py-2">Nominales</th>
+              <th className="text-right px-3 py-2">Costo USD</th>
+              <th className="text-right px-3 py-2">Valor hoy</th>
+              <th className="text-right px-3 py-2">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -575,22 +732,33 @@ function InversionesContenido() {
                   key={p.id}
                   className="border-t border-slate-100 dark:border-slate-800"
                 >
-                  <td className="px-4 py-2 whitespace-nowrap text-slate-700 dark:text-slate-300">
+                  <td className="px-3 py-2 whitespace-nowrap text-slate-700 dark:text-slate-300">
                     {p.fecha_operacion}
                   </td>
-                  <td className="px-4 py-2 font-medium text-slate-900 dark:text-white">
+                  <td className="px-3 py-2 font-medium text-slate-900 dark:text-white">
                     {p.ticker}
+                    {esTodos && (
+                      <span className="block text-[10px] font-normal text-slate-400">
+                        {p.cuenta_nombre}
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-2 text-right text-slate-700 dark:text-slate-300">
-                    {p.cantidad}
+                  <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
+                    {Number(p.cantidad_actual ?? p.cantidad)}
+                    {p.cantidad_actual != null &&
+                      Number(p.cantidad_actual) !== Number(p.cantidad) && (
+                        <span className="block text-[10px] text-slate-400">
+                          compra: {Number(p.cantidad)}
+                        </span>
+                      )}
                   </td>
-                  <td className="px-4 py-2 text-right text-slate-700 dark:text-slate-300">
+                  <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
                     {p.costo_usd != null ? formatUSD(p.costo_usd) : "—"}
                   </td>
-                  <td className="px-4 py-2 text-right font-medium text-slate-900 dark:text-white">
+                  <td className="px-3 py-2 text-right font-medium text-slate-900 dark:text-white">
                     {formatUSD(p.valor_actual_usd)}
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-3 py-2 text-right">
                     <button
                       onClick={() => confirmarEliminar(p.id)}
                       className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1.5 text-xs font-medium transition-colors dark:bg-rose-600 dark:hover:bg-rose-500"
@@ -605,6 +773,288 @@ function InversionesContenido() {
           </tbody>
         </table>
       </div>
+
+      {ventas.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-3">
+            Ventas realizadas
+          </p>
+          <div className="space-y-2">
+            {ventas.map((v) => {
+              const res =
+                v.ingreso_usd != null && v.costo_usd != null
+                  ? Number(v.ingreso_usd) - Number(v.costo_usd)
+                  : null;
+              return (
+                <div
+                  key={v.id}
+                  className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 bg-slate-50 dark:bg-slate-800"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      {v.ticker} · {Number(v.cantidad)} nominales
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {v.fecha_operacion}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">
+                        {formatUSD(v.ingreso_usd)}
+                      </p>
+                      {res != null && (
+                        <p
+                          className={`text-xs ${res >= 0 ? "text-emerald-600" : "text-rose-600"}`}
+                        >
+                          {res >= 0 ? "+" : ""}
+                          {formatUSD(res)}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setIdVentaAEliminar(v.id)}
+                      title="Eliminar venta"
+                      className="inline-flex items-center rounded-md bg-rose-600 hover:bg-rose-700 text-white p-1.5 transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación: eliminar venta */}
+      {idVentaAEliminar && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setIdVentaAEliminar(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              ¿Eliminar venta?
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+              Se borra el ingreso generado en la cuenta y las compras recuperan
+              los nominales que se les había descontado.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIdVentaAEliminar(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={ejecutarEliminacionVenta}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 transition-colors"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de venta */}
+      {ventaModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto"
+          onClick={() => !guardando && setVentaModal(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl p-5 shadow-lg mt-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-1 text-slate-900 dark:text-white">
+              Nueva venta
+            </h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Se descuenta de las compras más viejas primero (FIFO) y el importe
+              entra como ingreso a la cuenta.
+            </p>
+
+            <form onSubmit={handleVenta} className="space-y-3">
+              <select
+                value={formVenta.ticker}
+                onChange={(e) =>
+                  setFormVenta({ ...formVenta, ticker: e.target.value })
+                }
+                className={`w-full ${INPUT}`}
+              >
+                <option value="">Activo a vender...</option>
+                {Object.entries(tenencias).map(([t, n]) => (
+                  <option key={t} value={t}>
+                    {t} · tenés {n}
+                  </option>
+                ))}
+              </select>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="Nominales a vender"
+                  value={formVenta.cantidad}
+                  onChange={(e) =>
+                    setFormVenta({ ...formVenta, cantidad: e.target.value })
+                  }
+                  className={INPUT}
+                />
+                <input
+                  placeholder="N° boleto"
+                  value={formVenta.boletoNumero}
+                  onChange={(e) =>
+                    setFormVenta({ ...formVenta, boletoNumero: e.target.value })
+                  }
+                  className={INPUT}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="date"
+                  value={formVenta.fechaOperacion}
+                  onChange={(e) =>
+                    setFormVenta({
+                      ...formVenta,
+                      fechaOperacion: e.target.value,
+                    })
+                  }
+                  className={INPUT}
+                />
+                <select
+                  value={formVenta.moneda}
+                  onChange={(e) =>
+                    setFormVenta({ ...formVenta, moneda: e.target.value })
+                  }
+                  className={INPUT}
+                >
+                  <option value="ARS">Cobrado en ARS</option>
+                  <option value="USD">Cobrado en USD</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Precio unit. bruto"
+                  value={formVenta.precioUnitarioBruto}
+                  onChange={(e) =>
+                    setFormVenta({
+                      ...formVenta,
+                      precioUnitarioBruto: e.target.value,
+                    })
+                  }
+                  className={INPUT}
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Importe bruto"
+                  value={formVenta.importeBruto}
+                  onChange={(e) =>
+                    setFormVenta({ ...formVenta, importeBruto: e.target.value })
+                  }
+                  className={INPUT}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Arancel"
+                  value={formVenta.arancel}
+                  onChange={(e) =>
+                    setFormVenta({ ...formVenta, arancel: e.target.value })
+                  }
+                  className={INPUT}
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Comisión"
+                  value={formVenta.comision}
+                  onChange={(e) =>
+                    setFormVenta({ ...formVenta, comision: e.target.value })
+                  }
+                  className={INPUT}
+                />
+              </div>
+
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Importe neto cobrado (lo que entra a la cuenta)"
+                value={formVenta.importeNeto}
+                onChange={(e) =>
+                  setFormVenta({ ...formVenta, importeNeto: e.target.value })
+                }
+                className={`w-full ${INPUT}`}
+              />
+
+              {formVenta.moneda === "ARS" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="MEP de ese día"
+                    value={formVenta.tcMep}
+                    onChange={(e) =>
+                      setFormVenta({ ...formVenta, tcMep: e.target.value })
+                    }
+                    className={INPUT}
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="CCL de ese día"
+                    value={formVenta.tcCcl}
+                    onChange={(e) =>
+                      setFormVenta({ ...formVenta, tcCcl: e.target.value })
+                    }
+                    className={INPUT}
+                  />
+                </div>
+              )}
+
+              {error && (
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {error}
+                </p>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setVentaModal(false)}
+                  disabled={guardando}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardando}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50"
+                >
+                  {guardando ? "Guardando..." : "Guardar venta"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal de confirmación de eliminación */}
       {idItemAEliminar && (

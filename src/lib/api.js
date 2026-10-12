@@ -246,11 +246,37 @@ export async function deleteCompraCuotas(id) {
 
 // ---------- Vistas de resumen ----------
 
-export async function getResumenCategoria(mesPeriodo) {
+// Categorías marcadas como "no cuentan para análisis" (categorias.excluir_de_analisis),
+// ej. "Pago de tarjeta": ese gasto ya se contó cuando consumiste. Solo afecta a
+// Resumen / Evolución; los saldos de las cuentas siguen descontando el pago.
+let _excluidasCache = null;
+
+async function getCategoriasExcluidas() {
+  if (_excluidasCache) return _excluidasCache;
   const { data, error } = await supabase
-    .from("vw_resumen_categoria")
-    .select("*")
-    .eq("mes_periodo", mesPeriodo);
+    .from("categorias")
+    .select("nombre")
+    .eq("excluir_de_analisis", true);
+  if (error) throw error;
+  _excluidasCache = data.map((c) => c.nombre);
+  return _excluidasCache;
+}
+
+function sinExcluidas(query, excluidas) {
+  if (!excluidas.length) return query;
+  const lista = excluidas.map((n) => `"${n.replace(/"/g, '\\"')}"`).join(",");
+  return query.not("categoria", "in", `(${lista})`);
+}
+
+export async function getResumenCategoria(mesPeriodo) {
+  const excluidas = await getCategoriasExcluidas();
+  const { data, error } = await sinExcluidas(
+    supabase
+      .from("vw_resumen_categoria")
+      .select("*")
+      .eq("mes_periodo", mesPeriodo),
+    excluidas,
+  );
   if (error) throw error;
   return data;
 }
@@ -266,12 +292,16 @@ export async function getDeudaFutura(mesPeriodo) {
 }
 
 export async function getResumenCategoriaRango(mesDesde, mesHasta) {
-  const { data, error } = await supabase
-    .from("vw_resumen_categoria")
-    .select("*")
-    .gte("mes_periodo", mesDesde)
-    .lte("mes_periodo", mesHasta)
-    .order("mes_periodo");
+  const excluidas = await getCategoriasExcluidas();
+  const { data, error } = await sinExcluidas(
+    supabase
+      .from("vw_resumen_categoria")
+      .select("*")
+      .gte("mes_periodo", mesDesde)
+      .lte("mes_periodo", mesHasta)
+      .order("mes_periodo"),
+    excluidas,
+  );
   if (error) throw error;
   return data;
 }
