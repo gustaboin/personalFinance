@@ -21,6 +21,7 @@ import {
 import { Maximize2, X, Trash2 } from "lucide-react";
 import { getCuentas } from "../lib/cuentasApi";
 import FichaTicker from "../components/FichaTicker";
+import DividendosCartera from "../components/DividendosCartera";
 
 const COLORES = [
   "#2563eb",
@@ -665,6 +666,12 @@ function InversionesContenido() {
         nombreCuenta={
           cuentasBroker.find((c) => String(c.id) === String(cuentaId))?.nombre
         }
+      />
+
+      <DividendosCartera
+        key={`div-${refreshKey}`}
+        posiciones={posiciones}
+        cuentaId={cuentaId}
       />
 
       {resumen && (

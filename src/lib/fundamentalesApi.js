@@ -1,6 +1,6 @@
 import { supabase } from "./supabaseClient";
 
-// Datos de la ficha de un ticker (los carga la Edge Function sync-fundamentales) --
+// Datos de la ficha de un ticker (los carga la Edge Function sync-fundamentales)
 
 export async function getInfoTicker(ticker) {
   const { data, error } = await supabase
@@ -41,4 +41,31 @@ export async function getUltimoPrecio(ticker) {
     .maybeSingle();
   if (error) throw error;
   return data;
+}
+
+// ---- Dividendos de la cartera ----
+
+// Estimado cobrado en cada fecha ex (vista vw_dividendos_cartera). cuentaId = null -> todas
+export async function getDividendosCartera(cuentaId) {
+  let q = supabase
+    .from("vw_dividendos_cartera")
+    .select(
+      "ticker, fecha_ex, dividendo_por_accion, acciones, estimado_usd, cuenta_id",
+    );
+  if (cuentaId) q = q.eq("cuenta_id", cuentaId);
+  const { data, error } = await q.order("fecha_ex", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Dividendos por acción de los últimos 12 meses de todos los tickers (para proyectar)
+export async function getDividendosUltimos12m() {
+  const desde = new Date();
+  desde.setFullYear(desde.getFullYear() - 1);
+  const { data, error } = await supabase
+    .from("dividendos")
+    .select("ticker, fecha_ex, monto")
+    .gte("fecha_ex", desde.toISOString().slice(0, 10));
+  if (error) throw error;
+  return data ?? [];
 }
