@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
     if (error) throw error;
   }
 
-  // --- CONTROL DE INACTIVIDAD (60 segundos) ---
+  // --- CONTROL DE INACTIVIDAD (120 segundos) ---
   useEffect(() => {
     // Si no hay sesión iniciada, no activamos el contador
     if (!session) return;
@@ -40,8 +40,8 @@ export function AuthProvider({ children }) {
     const reiniciarContador = () => {
       // Limpiamos el temporizador
       clearTimeout(inactivityTimer);
-      // empi9eza uno nuevo por 60 segundos (60000 ms)
-      inactivityTimer = setTimeout(cerrarSesionPorInactividad, 60000);
+      // empi9eza uno nuevo por 120 segundos (120000 ms)
+      inactivityTimer = setTimeout(cerrarSesionPorInactividad, 120000);
     };
 
     // Eventos que consideraremos como "actividad" del usuario

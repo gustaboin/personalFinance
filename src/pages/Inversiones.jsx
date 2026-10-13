@@ -20,6 +20,7 @@ import {
 } from "../lib/inversionesApi";
 import { Maximize2, X, Trash2 } from "lucide-react";
 import { getCuentas } from "../lib/cuentasApi";
+import FichaTicker from "../components/FichaTicker";
 
 const COLORES = [
   "#2563eb",
@@ -322,6 +323,9 @@ function InversionesContenido() {
 
   const esTodos = cuentaId === "todos";
 
+  // Ficha de fundamentales del ticker tocado
+  const [tickerFicha, setTickerFicha] = useState(null);
+
   useEffect(() => {
     getCuentas().then((data) => {
       const brokers = data.filter((c) => c.tipo === "broker");
@@ -619,7 +623,9 @@ function InversionesContenido() {
               {resumenTicker.map((r, i) => (
                 <div
                   key={r.ticker}
-                  className="flex items-center justify-between rounded-lg px-3 py-2 bg-slate-50 dark:bg-slate-800"
+                  onClick={() => setTickerFicha(r.ticker)}
+                  title="Ver ficha de fundamentales"
+                  className="flex items-center justify-between rounded-lg px-3 py-2 bg-slate-50 dark:bg-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     <span
@@ -862,6 +868,13 @@ function InversionesContenido() {
             </div>
           </div>
         </div>
+      )}
+
+      {tickerFicha && (
+        <FichaTicker
+          ticker={tickerFicha}
+          onClose={() => setTickerFicha(null)}
+        />
       )}
 
       {/* Modal de venta */}
