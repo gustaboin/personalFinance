@@ -22,6 +22,7 @@ import { Maximize2, X, Trash2 } from "lucide-react";
 import { getCuentas } from "../lib/cuentasApi";
 import FichaTicker from "../components/FichaTicker";
 import DividendosCartera from "../components/DividendosCartera";
+import LogoTicker from "../components/LogoTicker";
 
 const COLORES = [
   "#2563eb",
@@ -633,6 +634,7 @@ function InversionesContenido() {
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: COLORES[i % COLORES.length] }}
                     />
+                    <LogoTicker ticker={r.ticker} size={40} />
                     <div>
                       <p className="text-sm font-medium text-slate-900 dark:text-white">
                         {r.ticker}

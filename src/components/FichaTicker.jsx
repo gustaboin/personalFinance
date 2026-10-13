@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { X } from "lucide-react";
+import LogoTicker from "./LogoTicker";
 import {
   getInfoTicker,
   getFundamentales,
@@ -287,17 +288,20 @@ export default function FichaTicker({ ticker, onClose }) {
       >
         {/* Encabezado */}
         <div className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              {ticker}
-            </h3>
-            <p className="text-xs text-slate-400">
-              {info?.nombre ? `${info.nombre} · ` : ""}
-              {moneda && moneda !== "USD" ? `Reporta en ${moneda} · ` : ""}
-              {actualizado
-                ? `Actualizado ${String(actualizado).slice(0, 10)}`
-                : "Sin estados contables cargados"}
-            </p>
+          <div className="flex items-center gap-3">
+            <LogoTicker ticker={ticker} size={52} className="rounded-xl" />
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                {ticker}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {info?.nombre ? `${info.nombre} · ` : ""}
+                {moneda && moneda !== "USD" ? `Reporta en ${moneda} · ` : ""}
+                {actualizado
+                  ? `Actualizado ${String(actualizado).slice(0, 10)}`
+                  : "Sin estados contables cargados"}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
