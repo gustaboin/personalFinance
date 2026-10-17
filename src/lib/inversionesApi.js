@@ -1,5 +1,15 @@
 import { supabase } from "./supabaseClient";
 
+// Recalcula los lotes FIFO de un ticker respetando el ratio de cada fecha. // ejemplo CAT
+// (función SQL recalcular_fifo) y actualiza la tabla inversiones_ventas_lotes.
+export async function recalcularFifo(cuentaId, ticker) {
+  const { error } = await supabase.rpc("recalcular_fifo", {
+    p_cuenta_id: cuentaId,
+    p_ticker: ticker,
+  });
+  if (error) throw error;
+}
+
 // --- Lectura ---
 
 // cuentaId = null -> todas las cuentas
@@ -157,6 +167,13 @@ export async function addCompraInversion({
     throw errorMovimiento;
   }
 
+  // Si ya hay ventas cargadas, una compra más vieja puede cambiar qué lote consumieron
+  try {
+    await recalcularFifo(cuentaId, ticker);
+  } catch (e) {
+    console.warn("No se pudo recalcular FIFO tras la compra:", e.message);
+  }
+
   return posicion;
 }
 
@@ -179,7 +196,8 @@ export async function deleteCompraInversion(posicionId) {
 
 // --- Ventas (FIFO) ---
 // Hace 3 cosas: 1) registra la venta  2) descuenta de las compras más viejas
-// (inversiones_ventas_lotes)  3) registra el INGRESO en la cuenta del broker.
+// (inversiones_ventas_lotes, vía recalcular_fifo)  3) registra el INGRESO en la cuenta del broker.
+// `cantidad` va en la unidad del boleto: el ratio vigente el día de la venta.
 // Si un paso falla, deshace los anteriores a mano.
 
 // cuentaId = null -> todas las cuentas
@@ -199,7 +217,7 @@ export async function addVentaInversion({
   boletoNumero,
   fechaOperacion,
   fechaLiquidacion,
-  cantidad, // nominales de hoy que se venden
+  cantidad, // nominales en la unidad del día de la venta (ratio de esa fecha)
   moneda, // 'ARS' | 'USD'
   precioUnitarioBruto,
   importeBruto,
@@ -210,49 +228,7 @@ export async function addVentaInversion({
   tcMep,
   notas,
 }) {
-  // 1. Lotes disponibles, del más viejo al más nuevo (FIFO)
-  const { data: lotes, error: errorLotes } = await supabase
-    .from("vw_inversiones_valuacion")
-    .select(
-      "id, cantidad_restante, cantidad_actual, ratio_al_comprar, ratio_actual",
-    )
-    .eq("cuenta_id", cuentaId)
-    .eq("ticker", ticker)
-    .order("fecha_operacion", { ascending: true })
-    .order("id", { ascending: true });
-  if (errorLotes) throw errorLotes;
-
-  const disponible = (lotes ?? []).reduce(
-    (s, l) => s + Number(l.cantidad_actual),
-    0,
-  );
-  if (!lotes?.length || cantidad > disponible + 1e-9) {
-    throw new Error(
-      `No alcanza: tenés ${disponible} nominales de ${ticker} en esta cuenta.`,
-    );
-  }
-
-  // 2. Plan FIFO: en nominales de hoy, y convertido a unidades del boleto de compra
-  let faltante = cantidad;
-  const plan = [];
-  for (const l of lotes) {
-    if (faltante <= 1e-9) break;
-    const enLote = Number(l.cantidad_actual);
-    const tomar = Math.min(faltante, enLote);
-    const factor =
-      l.ratio_actual && l.ratio_al_comprar
-        ? Number(l.ratio_al_comprar) / Number(l.ratio_actual)
-        : 1;
-    const compra = Math.min(tomar * factor, Number(l.cantidad_restante));
-    plan.push({
-      posicion_id: l.id,
-      cantidad_compra: compra,
-      cantidad_nominales: tomar,
-    });
-    faltante -= tomar;
-  }
-
-  // 3. Medio de pago de la cuenta (para que el ingreso sume saldo)
+  // 1. Medio de pago de la cuenta (para que el ingreso sume saldo)
   const { data: medios, error: errorMedio } = await supabase
     .from("medios_pago")
     .select("id, nombre")
@@ -271,7 +247,7 @@ export async function addVentaInversion({
     .single();
   if (errorCategoria) throw errorCategoria;
 
-  // 4. Venta
+  // 2. Venta
   const { data: venta, error: errorVenta } = await supabase
     .from("inversiones_ventas")
     .insert({
@@ -295,16 +271,16 @@ export async function addVentaInversion({
     .single();
   if (errorVenta) throw errorVenta;
 
-  // 5. Lotes consumidos
-  const { error: errorLotesIns } = await supabase
-    .from("inversiones_ventas_lotes")
-    .insert(plan.map((p) => ({ ...p, venta_id: venta.id })));
-  if (errorLotesIns) {
+  // 3. Lotes FIFO: la cantidad de la venta está en la unidad que regía ese día
+  //    y sólo consume compras hasta esa fecha. Si no alcanza, la función falla.
+  try {
+    await recalcularFifo(cuentaId, ticker);
+  } catch (e) {
     await supabase.from("inversiones_ventas").delete().eq("id", venta.id);
-    throw errorLotesIns;
+    throw new Error(e.message || "No alcanza para esta venta.");
   }
 
-  // 6. Ingreso en la cuenta
+  // 4. Ingreso en la cuenta
   const { error: errorMov } = await supabase.from("movimientos").insert({
     fecha: fechaOperacion,
     categoria_id: categoria.id,
@@ -316,6 +292,7 @@ export async function addVentaInversion({
   });
   if (errorMov) {
     await supabase.from("inversiones_ventas").delete().eq("id", venta.id); // borra los lotes en cascada
+    await recalcularFifo(cuentaId, ticker).catch(() => {});
     throw errorMov;
   }
 
@@ -325,6 +302,11 @@ export async function addVentaInversion({
 // Baja de una venta: borra el ingreso, los lotes (cascada) y la venta.
 // Las compras recuperan automáticamente lo que se les había descontado.
 export async function deleteVentaInversion(ventaId) {
+  const { data: venta } = await supabase
+    .from("inversiones_ventas")
+    .select("cuenta_id, ticker")
+    .eq("id", ventaId)
+    .maybeSingle();
   const { error: errorMov } = await supabase
     .from("movimientos")
     .delete()
@@ -335,4 +317,9 @@ export async function deleteVentaInversion(ventaId) {
     .delete()
     .eq("id", ventaId);
   if (error) throw error;
+  // Las ventas posteriores pueden reasignarse a otros lotes
+  if (venta)
+    await recalcularFifo(venta.cuenta_id, venta.ticker).catch((e) =>
+      console.warn(e.message),
+    );
 }

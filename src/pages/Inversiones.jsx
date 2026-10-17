@@ -634,7 +634,7 @@ function InversionesContenido() {
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: COLORES[i % COLORES.length] }}
                     />
-                    <LogoTicker ticker={r.ticker} size={40} />
+                    <LogoTicker ticker={r.ticker} size={28} />
                     <div>
                       <p className="text-sm font-medium text-slate-900 dark:text-white">
                         {r.ticker}
@@ -901,7 +901,8 @@ function InversionesContenido() {
             </h3>
             <p className="text-xs text-slate-400 mb-4">
               Se descuenta de las compras más viejas primero (FIFO) y el importe
-              entra como ingreso a la cuenta.
+              entra como ingreso a la cuenta. Los nominales van en la unidad del
+              boleto, es decir con el ratio que regía el día de la venta.
             </p>
 
             <form onSubmit={handleVenta} className="space-y-3">
