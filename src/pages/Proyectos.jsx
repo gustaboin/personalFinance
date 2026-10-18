@@ -623,13 +623,11 @@ export default function Proyectos() {
                   margin={{ left: 20, right: 20 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-
                   <XAxis
                     type="number"
                     tickFormatter={(v) => formatARS(v)}
                     fontSize={11}
                   />
-
                   <YAxis
                     dataKey="proveedor"
                     type="category"
@@ -637,8 +635,17 @@ export default function Proyectos() {
                     className="text-sm font-medium"
                     width={180}
                   />
-
-                  <Tooltip cursor={false} formatter={(v) => formatARS(v)} />
+                  <Tooltip
+                    cursor={false}
+                    formatter={(v) => formatARS(v)}
+                    contentStyle={{
+                      backgroundColor: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "10px",
+                      color: "#fff",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
                   <defs>
                     <linearGradient
                       id="textGradient"

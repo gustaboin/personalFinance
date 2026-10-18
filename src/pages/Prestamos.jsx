@@ -509,6 +509,13 @@ export default function Prestamos() {
                         ? formatARS(v)
                         : v?.toLocaleString("es-AR")
                     }
+                    contentStyle={{
+                      backgroundColor: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "10px",
+                      color: "#fff",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
                   />
 
                   <Legend />
@@ -584,7 +591,16 @@ export default function Prestamos() {
 
                   <YAxis fontSize={11} tickFormatter={(v) => `${v}%`} />
 
-                  <Tooltip formatter={(v) => `${Number(v).toFixed(2)}%`} />
+                  <Tooltip
+                    formatter={(v) => `${Number(v).toFixed(2)}%`}
+                    contentStyle={{
+                      backgroundColor: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "10px",
+                      color: "#fff",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
 
                   <Legend />
 
