@@ -406,6 +406,7 @@ export default function Dashboard() {
                   />
 
                   <Tooltip
+                    cursor={false} // Desactiva el cursor de la tooltip a futuro ver como mejorar la visualización del tooltip
                     formatter={(v) => formatARS(v)}
                     contentStyle={{
                       backgroundColor: "#0f172a",

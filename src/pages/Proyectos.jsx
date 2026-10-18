@@ -638,7 +638,7 @@ export default function Proyectos() {
                     width={180}
                   />
 
-                  <Tooltip formatter={(v) => formatARS(v)} />
+                  <Tooltip cursor={false} formatter={(v) => formatARS(v)} />
                   <defs>
                     <linearGradient
                       id="textGradient"
