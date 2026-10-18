@@ -28,10 +28,7 @@ export default function Dashboard() {
   const [cotizacion, setCotizacion] = useState(null); // { fecha, valorventa } | null
   const [objetivoUsd, setObjetivoUsd] = useState(OBJETIVO_AHORRO_USD_DEFAULT);
   const [loading, setLoading] = useState(true);
-  const [saldoProp, setSaldoProp] = useState(true); // Estado para controlar la visibilidad del detalle de cuentas en el Dashboard (por defecto oculto: false)
-
-  // Estado para controlar la visibilidad del detalle de cuentas en el Dashboard (por defecto oculto: true)
-  //const [soloSaldoDashboard, setSoloSaldoDashboard] = useState(true);
+  const [saldoProp, setSaldoProp] = useState(true);
 
   // Toggle para incluir/excluir gastos de proyectos (ej. Obra) del resumen del mes
   const [incluirProyectos, setIncluirProyectos] = useState(false);
@@ -125,18 +122,16 @@ export default function Dashboard() {
     .map((r) => ({ categoria: r.categoria, total: Number(r.total_ars) }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* =====================================================
           HEADER
       ====================================================== */}
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             Resumen del mes
           </h2>
-
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             Tu situación financiera para este período.
           </p>
         </div>
@@ -147,149 +142,69 @@ export default function Dashboard() {
       {/* =====================================================
           SALDOS DE CUENTAS (vista compacta / toggle)
       ====================================================== */}
-
-      <div
-        className="
-          bg-white
-          border border-slate-200
-          rounded-2xl
-          p-5
-          shadow-sm
-
-          dark:bg-slate-900
-          dark:border-slate-800
-          dark:shadow-black/20
-        "
-      >
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-            Saldos
-          </p>
-        </div>
-
-        {/* Pasamos la prop de control al componente SaldosPanel */}
+      <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
         <SaldosPanel compact={false} soloSaldoProp={saldoProp} />
       </div>
 
       {/* =====================================================
           CONFIGURACIÓN DEL MES
       ====================================================== */}
-
-      <div
-        className="
-          bg-white
-          border border-slate-200
-          rounded-2xl
-          p-5
-          shadow-sm
-
-          dark:bg-slate-900
-          dark:border-slate-800
-          dark:shadow-black/20
-        "
-      >
-        <div className="flex flex-wrap items-end gap-6">
-          {/* Cotización USD — solo lectura, viene del cron diario del BCRA */}
-          <div>
-            <label
-              className="
-                block
-                text-xs
-                font-medium
-                text-slate-500
-                dark:text-slate-400
-                mb-1.5
-              "
-            >
-              Cotización USD
-            </label>
-
-            {cotizacion ? (
-              <div>
-                <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                  {formatARS(cotizacion.valorventa)}
+      <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-6">
+          <div className="flex flex-wrap items-center gap-6">
+            {/* Cotización USD */}
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                Cotización USD
+              </label>
+              {cotizacion ? (
+                <div>
+                  <p className="text-lg font-bold text-slate-900 dark:text-white">
+                    {formatARS(cotizacion.valorventa)}
+                  </p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                    al {cotizacion.fecha}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                  Sin cotización cargada todavía.
                 </p>
-                <p className="text-xs text-slate-400 dark:text-slate-500">
-                  al {cotizacion.fecha}
-                </p>
+              )}
+            </div>
+
+            {/* Objetivo de Ahorro */}
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                Objetivo de ahorro mensual
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={objetivoUsd}
+                  onChange={(e) => setObjetivoUsd(Number(e.target.value) || 0)}
+                  className="w-28 rounded-xl border border-slate-300 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white px-3 py-1.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                />
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  USD
+                </span>
               </div>
-            ) : (
-              <p className="text-sm text-amber-600 dark:text-amber-400">
-                Sin cotización cargada todavía.
-              </p>
-            )}
-          </div>
-
-          {/* Objetivo */}
-          <div>
-            <label
-              className="
-                block
-                text-xs
-                font-medium
-                text-slate-500
-                dark:text-slate-400
-                mb-1.5
-              "
-            >
-              Objetivo de ahorro mensual
-            </label>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                value={objetivoUsd}
-                onChange={(e) => setObjetivoUsd(Number(e.target.value) || 0)}
-                className="
-                  w-32
-                  rounded-lg
-                  border border-slate-300
-                  bg-white
-                  text-slate-900
-                  px-3
-                  py-1.5
-                  text-sm
-
-                  focus:outline-none
-                  focus:ring-2
-                  focus:ring-slate-200
-
-                  dark:border-slate-700
-                  dark:bg-slate-800
-                  dark:text-white
-                  dark:focus:ring-slate-700
-                "
-              />
-
-              <span className="text-sm text-slate-500 dark:text-slate-400">
-                USD
-              </span>
             </div>
           </div>
 
-          {/* Toggle proyectos: solo se muestra si el mes tiene algún gasto de proyecto */}
+          {/* Toggle Proyectos */}
           {hayDatosDeProyecto && (
             <div>
-              <label
-                className="
-                  block
-                  text-xs
-                  font-medium
-                  text-slate-500
-                  dark:text-slate-400
-                  mb-1.5
-                "
-              >
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
                 Gastos de proyectos
               </label>
-
               <button
                 onClick={() => setIncluirProyectos((v) => !v)}
-                className="
-                          rounded-xl text-sm font-medium px-4 py-2 
-                          transition-all duration-200 shadow-md shadow-[#fa6400]/20 active:scale-[0.98]
-                          bg-[#fa6400]/75 hover:bg-[#e05900] 
-                          text-slate-100 dark:text-slate-300"
+                className={`rounded-xl text-xs font-semibold px-4 py-2 transition-all duration-200 border ${
+                  incluirProyectos
+                    ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40 hover:bg-amber-500/30"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700"
+                }`}
               >
                 {incluirProyectos ? "Ocultar proyectos" : "Incluir proyectos"}
               </button>
@@ -301,111 +216,134 @@ export default function Dashboard() {
       {/* =====================================================
           LOADING
       ====================================================== */}
-
       {loading ? (
-        <p className="text-slate-400 dark:text-slate-500 text-sm">
-          Cargando...
-        </p>
+        <div className="py-12 text-center">
+          <p className="text-slate-400 dark:text-slate-500 text-sm font-medium animate-pulse">
+            Cargando información del mes...
+          </p>
+        </div>
       ) : (
         <>
           {/* =================================================
-              SEMÁFORO
+              SEMÁFORO DE SITUACIÓN
           ================================================== */}
-
           <div
-            className={`
-              rounded-2xl
-              p-5
-              shadow-sm
-              text-white
-
-              ${
-                semaforo.tone === "good"
-                  ? "bg-emerald-600"
-                  : semaforo.tone === "bad"
-                    ? "bg-rose-600"
-                    : "bg-blue-400/75"
-              }
-            `}
+            className={`rounded-2xl p-4 border flex items-center gap-3 transition-all ${
+              semaforo.tone === "good"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
+                : semaforo.tone === "bad"
+                  ? "bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400"
+                  : "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400"
+            }`}
           >
-            <p className="text-xs uppercase tracking-wide opacity-80 mb-1">
-              Situación del mes
-            </p>
-
-            <p className="text-lg font-semibold">{semaforo.label}</p>
+            <span className="relative flex h-3 w-3 shrink-0">
+              <span
+                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  semaforo.tone === "good"
+                    ? "bg-emerald-400"
+                    : semaforo.tone === "bad"
+                      ? "bg-rose-400"
+                      : "bg-amber-400"
+                }`}
+              ></span>
+              <span
+                className={`relative inline-flex rounded-full h-3 w-3 ${
+                  semaforo.tone === "good"
+                    ? "bg-emerald-500"
+                    : semaforo.tone === "bad"
+                      ? "bg-rose-500"
+                      : "bg-amber-500"
+                }`}
+              ></span>
+            </span>
+            <div>
+              <p className="text-[10px] font-bold tracking-wider uppercase opacity-80">
+                Situación del mes
+              </p>
+              <p className="text-sm font-semibold">{semaforo.label}</p>
+            </div>
           </div>
 
           {/* =================================================
-              PRINCIPALES NÚMEROS
+              PRINCIPALES NÚMEROS (FINTECH METRICS)
           ================================================== */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* INGRESOS */}
+            <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Ingresos
+              </p>
+              <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-2 tracking-tight">
+                {formatARS(totales.ingresos)}
+              </p>
+            </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard
-              label="Ingresos"
-              value={formatARS(totales.ingresos)}
-              className="bg-[#5cb85c]"
-              textColor="text-white-400 dark:text-emerald-200"
-            />
+            {/* EGRESOS */}
+            <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Egresos
+              </p>
+              <p className="text-2xl font-extrabold text-rose-600 dark:text-rose-400 mt-2 tracking-tight">
+                {formatARS(totales.egresosSinAhorro)}
+              </p>
+            </div>
 
-            <StatCard
-              label="Egresos"
-              value={formatARS(totales.egresosSinAhorro)}
-              className="bg-red-600/75"
-              textColor="text-white-800 dark:text-red-200"
-            />
+            {/* AHORRO */}
+            <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Ahorro
+                </p>
+                <span
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    totales.ahorroCumplido
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                  }`}
+                >
+                  {totales.ahorroCumplido ? "Objetivo OK" : "Pendiente"}
+                </span>
+              </div>
+              <p className="text-2xl font-extrabold text-sky-600 dark:text-sky-400 mt-2 tracking-tight">
+                {formatARS(totales.ahorroRealizado)}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-500 mt-1.5 font-medium">
+                Objetivo: {formatUSD(objetivoUsd)} (
+                {formatARS(totales.objetivoAhorroArs)})
+              </p>
+            </div>
 
-            <StatCard
-              label="Ahorro"
-              value={formatARS(totales.ahorroRealizado)}
-              sub={`
-                Objetivo: ${formatUSD(objetivoUsd)}
-                (${formatARS(totales.objetivoAhorroArs)})
-              `}
-              tone={totales.ahorroCumplido ? "good" : "warn"}
-              className="bg-[#337ab7]"
-              textColor="text-white-800 dark:text-cyan-200"
-            />
-
-            <StatCard
-              label="Disponible"
-              value={formatARS(totales.disponible)}
-              tone={totales.disponible >= 0 ? "good" : "bad"}
-              className={
-                totales.disponible >= 0 ? "bg-emerald-600/75" : "bg-rose-600/75"
-              }
-              textColor="text-white-800 dark:text-white"
-            />
+            {/* DISPONIBLE */}
+            <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Disponible
+              </p>
+              <p
+                className={`text-2xl font-extrabold mt-2 tracking-tight ${
+                  totales.disponible >= 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-rose-600 dark:text-rose-400"
+                }`}
+              >
+                {formatARS(totales.disponible)}
+              </p>
+            </div>
           </div>
 
           {/* =================================================
               DEUDA FUTURA
           ================================================== */}
-
-          <div
-            className="
-              bg-white
-              border border-slate-200
-              rounded-2xl
-              p-5
-              shadow-sm
-
-              dark:bg-slate-900
-              dark:border-slate-800
-              dark:shadow-black/20
-            "
-          >
+          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Deuda comprometida
                 </p>
-
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                   Cuotas que vencen después de este mes.
                 </p>
               </div>
-
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">
+              <p className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                 {formatARS(totales.deudaTotal)}
               </p>
             </div>
@@ -414,26 +352,12 @@ export default function Dashboard() {
           {/* =================================================
               GASTOS POR CATEGORÍA
           ================================================== */}
-
-          <div
-            className="
-              bg-white
-              border border-slate-200
-              rounded-2xl
-              p-5
-              shadow-sm
-
-              dark:bg-slate-900
-              dark:border-slate-800
-              dark:shadow-black/20
-            "
-          >
+          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm">
             <div className="mb-4">
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Egresos por categoría
               </p>
-
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                 Distribución de tus gastos durante el mes
                 {!incluirProyectos && hayDatosDeProyecto
                   ? " (sin proyectos)"
@@ -443,7 +367,7 @@ export default function Dashboard() {
             </div>
 
             {chartData.length === 0 ? (
-              <p className="text-sm text-slate-400 dark:text-slate-500">
+              <p className="text-sm text-slate-400 dark:text-slate-500 py-6 text-center">
                 Sin gastos cargados este mes.
               </p>
             ) : (
@@ -462,8 +386,8 @@ export default function Dashboard() {
                   <CartesianGrid
                     strokeDasharray="3 3"
                     horizontal={false}
-                    stroke="#64748b"
-                    opacity={0.2}
+                    stroke="#475569"
+                    opacity={0.15}
                   />
 
                   <XAxis
@@ -488,6 +412,7 @@ export default function Dashboard() {
                       border: "1px solid #334155",
                       borderRadius: "10px",
                       color: "#fff",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                     }}
                   />
                   <defs>
@@ -498,14 +423,16 @@ export default function Dashboard() {
                       x2="1"
                       y2="0"
                     >
-                      <stop offset="0%" stopColor="#337ab7" />
-                      <stop offset="100%" stopColor="#60a5fa" />
+                      <stop offset="0%" stopColor="#0284c7" />
+                      <stop offset="100%" stopColor="#38bdf8" />
                     </linearGradient>
                   </defs>
                   <Bar
                     dataKey="total"
                     fill="url(#textGradient)"
                     radius={[0, 6, 6, 0]}
+                    isAnimationActive={true} // Activa la animación suave al cargar
+                    animationDuration={1000}
                   />
                 </BarChart>
               </ResponsiveContainer>
