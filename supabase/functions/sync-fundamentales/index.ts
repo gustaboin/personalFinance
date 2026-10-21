@@ -3,6 +3,9 @@
 // Trae de Yahoo Finance, para cada ticker activo de `tickers_seguidos`:
 //   1) Fundamentales anuales (resultados, balance, flujo de caja) -> tabla `fundamentales`
 //   2) Dividendos (fecha ex + monto por acción)                   -> tabla `dividendos`
+//   3) Fecha de pago (Yahoo calendarEvents.dividendDate)          -> `dividendos.fecha_pago`
+//      y el próximo dividendo anunciado                           -> `dividendos_proximos`
+//      (requiere setup-fecha-pago-dividendos.sql; si Yahoo falla, el resto sigue igual)
 // Hace upsert, así que se puede correr cuantas veces quieras.
 //
 // Los ETFs (SPY, QQQ, VEA, ...) no tienen estados contables: la función lo
@@ -107,6 +110,64 @@ async function traerDividendos(ticker: string) {
     }))
 }
 
+// ---- Fecha de pago: quoteSummary necesita cookie + crumb de Yahoo ----
+let _sesionYahoo: { cookie: string; crumb: string } | null = null
+
+async function sesionYahoo() {
+  if (_sesionYahoo) return _sesionYahoo
+  const r1 = await fetch('https://fc.yahoo.com', { headers: HEADERS, redirect: 'manual' })
+  const setCookie = r1.headers.get('set-cookie') ?? ''
+  const cookie = setCookie.split(';')[0]
+  if (!cookie) throw new Error('sin cookie de Yahoo')
+  const r2 = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+    headers: { ...HEADERS, Cookie: cookie },
+  })
+  const crumb = (await r2.text()).trim()
+  if (!r2.ok || !crumb || crumb.includes('<')) throw new Error(`crumb status ${r2.status}`)
+  _sesionYahoo = { cookie, crumb }
+  return _sesionYahoo
+}
+
+const aFecha = (seg: number | undefined | null) =>
+  seg ? new Date(seg * 1000).toISOString().slice(0, 10) : null
+
+// Devuelve { fecha_ex, fecha_pago, monto_estimado } (cualquiera puede ser null)
+async function traerProximoDividendo(ticker: string) {
+  const { cookie, crumb } = await sesionYahoo()
+  const url =
+    `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}` +
+    `?modules=calendarEvents,summaryDetail&crumb=${encodeURIComponent(crumb)}`
+  const res = await fetch(url, { headers: { ...HEADERS, Cookie: cookie } })
+  const texto = await res.text()
+  if (!res.ok || !texto) throw new Error(`calendario status ${res.status}`)
+
+  const r = JSON.parse(texto)?.quoteSummary?.result?.[0]
+  const cal = r?.calendarEvents
+  const det = r?.summaryDetail
+  return {
+    fecha_ex: aFecha(cal?.exDividendDate?.raw ?? det?.exDividendDate?.raw),
+    fecha_pago: aFecha(cal?.dividendDate?.raw),
+    monto_estimado: det?.lastDividendValue?.raw ?? null,
+  }
+}
+
+// Completa fecha_pago en el dividendo registrado más cercano (±3 días) a esa fecha ex
+async function asignarFechaPago(supabase: any, ticker: string, fechaEx: string | null, fechaPago: string | null) {
+  if (!fechaEx || !fechaPago) return 0
+  const d = new Date(fechaEx + 'T00:00:00Z')
+  const desde = new Date(d.getTime() - 3 * 86400000).toISOString().slice(0, 10)
+  const hasta = new Date(d.getTime() + 3 * 86400000).toISOString().slice(0, 10)
+  const { data, error } = await supabase
+    .from('dividendos')
+    .update({ fecha_pago: fechaPago })
+    .eq('ticker', ticker)
+    .gte('fecha_ex', desde)
+    .lte('fecha_ex', hasta)
+    .select('id')
+  if (error) throw new Error(error.message)
+  return data?.length ?? 0
+}
+
 Deno.serve(async (req) => {
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -164,6 +225,31 @@ Deno.serve(async (req) => {
       }
     } catch (err) {
       item.dividendos = `error: ${String(err)}`
+    }
+
+    // Fecha de pago: no debe romper el resto si Yahoo cambia o bloquea
+    try {
+      // 1) el anuncio anterior se aplica al dividendo que recién entró al histórico
+      const { data: previo } = await supabase
+        .from('dividendos_proximos')
+        .select('fecha_ex, fecha_pago')
+        .eq('ticker', ticker)
+        .maybeSingle()
+      if (previo) await asignarFechaPago(supabase, ticker, previo.fecha_ex, previo.fecha_pago)
+
+      // 2) lo que Yahoo informa ahora
+      const prox = await traerProximoDividendo(ticker)
+      if (prox.fecha_ex || prox.fecha_pago) {
+        await asignarFechaPago(supabase, ticker, prox.fecha_ex, prox.fecha_pago)
+        const { error } = await supabase
+          .from('dividendos_proximos')
+          .upsert({ ticker, ...prox, actualizado_en: new Date().toISOString() }, { onConflict: 'ticker' })
+        item.proximo = error ? `error: ${error.message}` : `${prox.fecha_ex ?? '?'} → pago ${prox.fecha_pago ?? '?'}`
+      } else {
+        item.proximo = 'sin dato'
+      }
+    } catch (err) {
+      item.proximo = `error: ${String(err)}`
     }
 
     console.log(JSON.stringify(item))

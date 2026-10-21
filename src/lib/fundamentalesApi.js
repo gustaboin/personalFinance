@@ -50,7 +50,7 @@ export async function getDividendosCartera(cuentaId) {
   let q = supabase
     .from("vw_dividendos_cartera")
     .select(
-      "ticker, fecha_ex, dividendo_por_accion, acciones, estimado_usd, cuenta_id",
+      "ticker, fecha_ex, fecha_pago, dividendo_por_accion, acciones, estimado_usd, cuenta_id",
     );
   if (cuentaId) q = q.eq("cuenta_id", cuentaId);
   const { data, error } = await q.order("fecha_ex", { ascending: false });
@@ -66,6 +66,15 @@ export async function getDividendosUltimos12m() {
     .from("dividendos")
     .select("ticker, fecha_ex, monto")
     .gte("fecha_ex", desde.toISOString().slice(0, 10));
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Próximo dividendo anunciado por ticker (fecha ex, fecha de pago, monto estimado por acción)
+export async function getDividendosProximos() {
+  const { data, error } = await supabase
+    .from("dividendos_proximos")
+    .select("ticker, fecha_ex, fecha_pago, monto_estimado");
   if (error) throw error;
   return data ?? [];
 }
