@@ -9,6 +9,14 @@ import {
   agregarResumen,
 } from "../lib/api";
 
+// api.js filtra resumenes.periodo con una fecha "AAAA-MM-01".
+// Acepta mesPeriodo como "202611", "2026-11" o "2026-11-01".
+function periodoComoFecha(mesPeriodo) {
+  const d = String(mesPeriodo ?? "").replace(/\D/g, "");
+  if (d.length < 6) return mesPeriodo;
+  return `${d.slice(0, 4)}-${d.slice(4, 6)}-01`;
+}
+
 function formatFecha(fecha) {
   if (!fecha) return "—";
   const d = new Date(fecha + "T00:00:00");
@@ -165,8 +173,14 @@ export default function Tarjetas() {
 
     setResumenLoading(true);
 
-    getResumenActualYAnterior(Number(medioId))
+    getResumenActualYAnterior(Number(medioId), periodoComoFecha(mesPeriodo))
       .then(({ actual, anterior }) => {
+        console.log(
+          "Resumen tarjeta",
+          medioId,
+          periodoComoFecha(mesPeriodo),
+          actual,
+        );
         setResumenActual(actual);
         setResumenAnterior(anterior);
       })
@@ -180,7 +194,7 @@ export default function Tarjetas() {
 
   useEffect(() => {
     cargarResumenes();
-  }, [medioId]);
+  }, [medioId, mesPeriodo]);
 
   function abrirModal() {
     setErrorModal("");
@@ -522,9 +536,12 @@ export default function Tarjetas() {
                   <span className="text-slate-500 dark:text-slate-400 w-12 shrink-0">
                     Cierre
                   </span>
+                  {/* comento por ahora el resumen anterior, porque no se está usando y genera confusión
+                  
                   <span className="text-slate-400 dark:text-slate-500">
                     {formatFecha(resumenAnterior?.fecha_cierre)}
                   </span>
+            */}
                   <span className="text-slate-400">→</span>
                   <span className="font-semibold text-slate-900 dark:text-white">
                     {formatFecha(resumenActual?.fecha_cierre)}
@@ -535,9 +552,12 @@ export default function Tarjetas() {
                   <span className="text-slate-500 dark:text-slate-400 w-12 shrink-0">
                     Vto.
                   </span>
+                  {/* comento por ahora el resumen anterior, porque no se está usando y genera confusión
+                  
                   <span className="text-slate-400 dark:text-slate-500">
                     {formatFecha(resumenAnterior?.fecha_vencimiento)}
                   </span>
+            */}
                   <span className="text-slate-400">→</span>
                   <span className="font-semibold text-slate-900 dark:text-white">
                     {formatFecha(resumenActual?.fecha_vencimiento)}
