@@ -23,6 +23,7 @@ import { getCuentas } from "../lib/cuentasApi";
 import FichaTicker from "../components/FichaTicker";
 import DividendosCartera from "../components/DividendosCartera";
 import LogoTicker from "../components/LogoTicker";
+import InfoActivos from "../components/InfoActivos";
 
 const COLORES = [
   "#2563eb",
@@ -328,6 +329,9 @@ function InversionesContenido() {
   // Ficha de fundamentales del ticker tocado
   const [tickerFicha, setTickerFicha] = useState(null);
 
+  // "cartera" (default) | "info" (catálogo de activos seguidos)
+  const [vista, setVista] = useState("cartera");
+
   useEffect(() => {
     getCuentas().then((data) => {
       const brokers = data.filter((c) => c.tipo === "broker");
@@ -548,12 +552,29 @@ function InversionesContenido() {
     }
   }
 
+  if (vista === "info") {
+    return (
+      <InfoActivos
+        onVolver={() => setVista("cartera")}
+        enCartera={resumenTicker.map((r) => r.ticker)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-          Inversiones
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+            Inversiones
+          </h2>
+          <button
+            onClick={() => setVista("info")}
+            className="rounded-lg border border-[#009688] text-[#009688] text-sm font-medium px-3 py-1.5 hover:bg-[#009688]/10"
+          >
+            Info activos
+          </button>
+        </div>
 
         <div className="flex items-center gap-2">
           <select
