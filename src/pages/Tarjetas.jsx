@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import MonthSwitcher from "../components/MonthSwitcher";
 import { currentMesPeriodo, formatARS } from "../lib/format";
 import {
@@ -33,6 +33,9 @@ export default function Tarjetas() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Total a pagar de cada tarjeta en el período (para ocultar las que están en cero)
+  const [totalesPorMedio, setTotalesPorMedio] = useState(null); // null = cargando
+
   // Resumen (cierre / vencimiento actual y anterior)
   const [resumenActual, setResumenActual] = useState(null);
   const [resumenAnterior, setResumenAnterior] = useState(null);
@@ -56,6 +59,7 @@ export default function Tarjetas() {
     8: "/images/ciudadM.png",
     9: "/images/ciudadV.png",
     12: "/images/mercadopago.png",
+    23: "/images/galiciaM.png",
   };
 
   const coloresMediosPago = {
@@ -69,6 +73,7 @@ export default function Tarjetas() {
     8: ["#26abec", "#0c53a5"],
     9: "#26abec",
     12: "#2abcff",
+    23: ["#fa6400", "#bf2e3b"],
   };
 
   useEffect(() => {
@@ -77,8 +82,6 @@ export default function Tarjetas() {
         if (!data) return;
 
         const tarjetasFiltradas = data.filter((m) => Number(m.tipo_id) === 4);
-
-        tarjetasFiltradas.sort((a, b) => b.nombre.localeCompare(a.nombre));
 
         setMedios(tarjetasFiltradas);
 
@@ -90,6 +93,44 @@ export default function Tarjetas() {
         // noop
       });
   }, []);
+
+  // Saldo a pagar de todas las tarjetas del período
+  useEffect(() => {
+    if (medios.length === 0) return;
+
+    let cancelled = false;
+    setTotalesPorMedio(null);
+
+    Promise.all(
+      medios.map((m) =>
+        getTotalTarjeta(mesPeriodo, Number(m.id))
+          .then((t) => [String(m.id), Number(t?.T ?? 0)])
+          .catch(() => [String(m.id), 0]),
+      ),
+    ).then((pares) => {
+      if (!cancelled) setTotalesPorMedio(Object.fromEntries(pares));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mesPeriodo, medios]);
+
+  // Solo las tarjetas con saldo a pagar en el período
+  const mediosVisibles = useMemo(() => {
+    if (!totalesPorMedio) return [];
+    return medios.filter((m) => (totalesPorMedio[String(m.id)] ?? 0) > 0.005);
+  }, [medios, totalesPorMedio]);
+
+  // Si la tarjeta elegida quedó oculta en este período, pasa a la primera visible
+  useEffect(() => {
+    if (!totalesPorMedio || mediosVisibles.length === 0) return;
+    if (!mediosVisibles.some((m) => String(m.id) === medioId)) {
+      setMedioId(String(mediosVisibles[0].id));
+    }
+  }, [mediosVisibles, totalesPorMedio, medioId]);
+
+  const sinSaldo = totalesPorMedio && mediosVisibles.length === 0;
 
   useEffect(() => {
     if (!medioId) return;
@@ -120,32 +161,14 @@ export default function Tarjetas() {
 
   // Trae el resumen activo + el anterior para la tarjeta seleccionada
   function cargarResumenes() {
-    if (!medioId || medioId === "0") {
-      setResumenActual(null);
-      setResumenAnterior(null);
-      return;
-    }
-
-    console.log(
-      "Cargando resumenes para medioId:",
-      medioId,
-      "mesPeriodo:",
-      mesPeriodo,
-    );
+    if (!medioId) return;
 
     setResumenLoading(true);
 
-    // Transformamo el periodo de navegación (ej: "202609") a formato fecha (ej: "2026-09-01")
-    const año = mesPeriodo.slice(0, 4);
-    const mes = mesPeriodo.slice(4);
-    const periodoFormateado = `${año}-${mes}-01`;
-    console.log("periodoFormateado:", periodoFormateado);
-    getResumenActualYAnterior(Number(medioId), periodoFormateado)
+    getResumenActualYAnterior(Number(medioId))
       .then(({ actual, anterior }) => {
-        // Al navegar, actual tendrá el resumen del mes seleccionado y anterior será null
         setResumenActual(actual);
         setResumenAnterior(anterior);
-        console.log("Resumen actual:", actual, "Resumen anterior:", anterior);
       })
       .catch((err) => {
         console.error("Error buscando cierre/vencimiento:", err);
@@ -157,7 +180,7 @@ export default function Tarjetas() {
 
   useEffect(() => {
     cargarResumenes();
-  }, [medioId, mesPeriodo]);
+  }, [medioId]);
 
   function abrirModal() {
     setErrorModal("");
@@ -188,7 +211,6 @@ export default function Tarjetas() {
       cargarResumenes();
     } catch (err) {
       console.error("Error al agregar resumen:", err);
-      //setErrorModal(err.message + (err.details ? " | " + err.details : ""));
       setErrorModal("No se pudo guardar el resumen. Revisá los datos.");
     } finally {
       setGuardando(false);
@@ -213,7 +235,17 @@ export default function Tarjetas() {
 
       {/* Medios de pago */}
       <div className="flex flex-wrap gap-2">
-        {medios.map((m) => {
+        {!totalesPorMedio && medios.length > 0 && (
+          <span className="text-sm text-slate-400">
+            Buscando tarjetas con saldo...
+          </span>
+        )}
+        {sinSaldo && (
+          <span className="text-sm text-slate-500 dark:text-slate-400">
+            Ninguna tarjeta tiene saldo a pagar en este período.
+          </span>
+        )}
+        {mediosVisibles.map((m) => {
           const activo = medioId === String(m.id);
           const color = coloresMediosPago[Number(m.id)];
 
@@ -490,11 +522,9 @@ export default function Tarjetas() {
                   <span className="text-slate-500 dark:text-slate-400 w-12 shrink-0">
                     Cierre
                   </span>
-                  {/* comento por ahora el resumen anterior, porque no se está usando y genera confusión
                   <span className="text-slate-400 dark:text-slate-500">
                     {formatFecha(resumenAnterior?.fecha_cierre)}
                   </span>
-                  */}
                   <span className="text-slate-400">→</span>
                   <span className="font-semibold text-slate-900 dark:text-white">
                     {formatFecha(resumenActual?.fecha_cierre)}
@@ -505,11 +535,9 @@ export default function Tarjetas() {
                   <span className="text-slate-500 dark:text-slate-400 w-12 shrink-0">
                     Vto.
                   </span>
-                  {/* comento por ahora el resumen anterior, porque no se está usando y genera confusión
                   <span className="text-slate-400 dark:text-slate-500">
                     {formatFecha(resumenAnterior?.fecha_vencimiento)}
                   </span>
-                  */}
                   <span className="text-slate-400">→</span>
                   <span className="font-semibold text-slate-900 dark:text-white">
                     {formatFecha(resumenActual?.fecha_vencimiento)}
