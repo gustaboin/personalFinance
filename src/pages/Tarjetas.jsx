@@ -264,7 +264,7 @@ export default function Tarjetas() {
             Total a pagar · Todas las tarjetas
           </p>
 
-          <p className="text-xl font-bold text-red-700 dark:text-red">
+          <p className="text-xl font-bold text-black-700 dark:text-black-200">
             {totalesPorMedio ? formatARS(totalTodas) : "..."}
           </p>
         </div>
