@@ -138,6 +138,12 @@ export default function Tarjetas() {
     }
   }, [mediosVisibles, totalesPorMedio, medioId]);
 
+  // Suma de todas las tarjetas del período
+  const totalTodas = useMemo(
+    () => Object.values(totalesPorMedio ?? {}).reduce((a, b) => a + b, 0),
+    [totalesPorMedio],
+  );
+
   const sinSaldo = totalesPorMedio && mediosVisibles.length === 0;
 
   useEffect(() => {
@@ -232,7 +238,7 @@ export default function Tarjetas() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Título + mes */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
@@ -242,10 +248,27 @@ export default function Tarjetas() {
         <MonthSwitcher mesPeriodo={mesPeriodo} onChange={setMesPeriodo} />
       </div>
 
-      {/* Descripción */}
-      <p className="text-sm text-slate-500 dark:text-slate-400 -mt-4">
-        Total real tarjeta por mes: movimientos + cuotas que vencen.
-      </p>
+      {/* Descripción + Monto total */}
+      <div className="flex items-center justify-between gap-6">
+        {/* descripcion a izquierda */}
+        <div className="min-w-0">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Total real tarjeta por mes: movimientos + cuotas que vencen.
+          </p>
+        </div>
+
+        {/* Monto total tarjet */}
+
+        <div className="shrink-0 text-right">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Total a pagar · Todas las tarjetas
+          </p>
+
+          <p className="text-xl font-bold text-red-700 dark:text-red">
+            {totalesPorMedio ? formatARS(totalTodas) : "..."}
+          </p>
+        </div>
+      </div>
 
       {/* Medios de pago */}
       <div className="flex flex-wrap gap-2">
@@ -311,7 +334,6 @@ export default function Tarjetas() {
           );
         })}
       </div>
-
       {/* Resumen */}
       <div
         className="
@@ -568,7 +590,6 @@ export default function Tarjetas() {
           </div>
         </div>
       </div>
-
       {/* Tabla */}
       <div
         className="
@@ -717,7 +738,6 @@ export default function Tarjetas() {
           </table>
         </div>
       </div>
-
       {/* Modal: Agregar resumen */}
       {modalAbierto && (
         <div
