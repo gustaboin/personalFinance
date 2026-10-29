@@ -582,11 +582,17 @@ function InversionesContenido() {
             onChange={(e) => setCuentaId(e.target.value)}
             className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-3 py-2 text-sm"
           >
-            {cuentasBroker.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
+            {cuentasBroker
+              .filter((c) => {
+                // agrego este filtro temporalmente para mostrar solo las de dolares
+                const nombre = c.nombre.toUpperCase();
+                return nombre.includes("USD") && !nombre.includes("ARS");
+              })
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
             <option value="todos">Todos</option>
           </select>
 
